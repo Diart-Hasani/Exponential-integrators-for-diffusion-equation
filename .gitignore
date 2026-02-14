@@ -1,0 +1,54 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.pyc
+*.pyo
+
+# =====================
+# Virtual environments
+# =====================
+.venv/
+
+# =====================
+# Data (never commit)
+# =====================
+data/raw/*
+data/processed/*
+data/external/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+# =====================
+# Model artifacts
+# =====================
+models/*
+!models/.gitkeep
+
+# =====================
+# Notebooks
+# =====================
+.ipynb_checkpoints/
+
+# =====================
+# OS / Editor
+# =====================
+.DS_Store
+.vscode/
+
+# =====================
+# Testing / Coverage
+# =====================
+.coverage
+.pytest_cache/
+
+# =====================
+# Logs
+# =====================
+*.log
+
+# =====================
+# Project notes
+# =====================
+project_goal.txt
