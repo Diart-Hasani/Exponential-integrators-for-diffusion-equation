@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional, Tuple
-
+from typing import Callable, Optional
 import numpy as np
-
 from .phi import PhiCache
 
 Array = np.ndarray

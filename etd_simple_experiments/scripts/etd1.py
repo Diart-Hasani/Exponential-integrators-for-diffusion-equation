@@ -8,7 +8,7 @@ from etd_simple_experiments.src.etd_methods import etd1_solve
 
 
 def main() -> None:
-    alpha = 10.0  # mild stiffness (try 50.0 later for stiff)
+    alpha = 100.0  # mild stiffness (try 50.0 later for stiff)
     t0 = 0.0
     T = 10.0
     h = 0.1

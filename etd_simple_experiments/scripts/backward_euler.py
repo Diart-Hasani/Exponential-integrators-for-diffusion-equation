@@ -30,7 +30,7 @@ def backward_euler_solve(
     t = float(t0)
     u = u0.copy()
 
-    I = np.eye(d)
+    id = np.eye(d)
 
     while t < T - 1e-15:
         h_step = min(h, T - t)
@@ -38,7 +38,7 @@ def backward_euler_solve(
 
         # Rearranged iteration:
         # (I - hA) u^{k+1} = u_n + h b(t_{n+1}, u^k)
-        M = I - h_step * A
+        M = id - h_step * A
 
         # Initial guess: previous value (or explicit Euler predictor)
         u_guess = u.copy()
@@ -71,7 +71,7 @@ def backward_euler_solve(
 
 def main() -> None:
     # Make A stiff so ETD vs BE behavior is visible
-    alpha = 10.0
+    alpha = 100.0
     t0 = 0.0
     T = 10.0
 
@@ -87,7 +87,6 @@ def main() -> None:
         T=T,
         h=h,
         A=A,
-        b=problem.b,
         fp_iters=50,
         tol=1e-12,
     )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
-from matrices import check_symmetric
+from .matrices import check_symmetric
 from typing import Dict, Iterable, Optional
 import numpy as np
 

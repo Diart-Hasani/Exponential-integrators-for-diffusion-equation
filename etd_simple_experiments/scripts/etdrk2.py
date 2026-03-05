@@ -7,7 +7,7 @@ from etd_simple_experiments.src.manufactured import make_stiff_linear_problem
 from etd_simple_experiments.src.etd_methods import etdrk2_solve
 
 def main() -> None:
-    alpha = 20.0  # mild stiffness (try 50.0 later for stiff)
+    alpha = 100.0  # mild stiffness (try 50.0 later for stiff)
     t0 = 0.0
     T = 10.0
     h = 0.1
