@@ -1,36 +1,26 @@
 import numpy as np
 from dataclasses import dataclass
-from typing import Callable
-
+from typing import Callable, Optional
 
 Array = np.ndarray
 
 
-def u_exact(t: float) -> Array:
-    """Exact solution u(t) = [cos t, sin t]."""
-    return np.array([np.cos(t), np.sin(t)], dtype=float)
+def expm_via_eig(t: float, A: Array) -> Array:
+    vals, vecs = np.linalg.eig(A)
+    Vinv = np.linalg.inv(vecs)
+    return (vecs @ np.diag(np.exp(t * vals)) @ Vinv).real
 
 
-def du_exact(t: float) -> Array:
-    """Derivative u'(t) = [-sin t, cos t]."""
-    return np.array([-np.sin(t), np.cos(t)], dtype=float)
-
-
-def N_square(u: Array) -> Array:
-    """
-    Nonlinearity N(u) = [u1^2, u2^2].
-    (Componentwise square, genuinely nonlinear.)
-    """
+def N_quadratic(u: Array) -> Array:
     return np.array([u[0] ** 2, u[1] ** 2], dtype=float)
+
+
+def N_sine(u: Array) -> Array:
+    return np.sin(u)
 
 
 @dataclass(frozen=True)
 class ManufacturedProblem:
-    """
-    Container for a manufactured semilinear problem:
-        u'(t) = A u(t) + b(t, u(t))
-    with known exact solution u_exact(t).
-    """
     A: Array
     u_exact: Callable[[float], Array]
     du_exact: Callable[[float], Array]
@@ -40,30 +30,100 @@ class ManufacturedProblem:
     u0: Array
 
 
-def make_problem_cos_sin_with_square_nonlinearity(A: Array) -> ManufacturedProblem:
+def make_stiff_linear_problem(
+    A: Array, u0: Optional[Array] = None
+) -> ManufacturedProblem:
     """
-    Builds b(t,u) = g(t) + N(u) such that u_exact(t) = [cos t, sin t]
-    is the exact solution of:
-        u' = A u + b(t,u)
-    with N(u) = [u1^2, u2^2].
+        u'(t) = A u(t)
+    Exact solution:
+        u_exact(t) = exp(tA) u0
+    """
+    A = np.array(A, dtype=float)
+    if u0 is None:
+        u0 = np.ones(A.shape[0], dtype=float)
 
-    g(t) is defined by:
-        g(t) = u'(t) - A u(t) - N(u(t))
-    """
+    def u_exact(t: float) -> Array:
+        return expm_via_eig(t, A) @ u0
+
+    def du_exact(t: float) -> Array:
+        return A @ u_exact(t)
+
+    def N(u: Array) -> Array:
+        return np.zeros_like(u, dtype=float)
+
     def g(t: float) -> Array:
-        u = u_exact(t)
-        return du_exact(t) - (A @ u) - N_square(u)
+        return np.zeros_like(u0, dtype=float)
 
     def b(t: float, u: Array) -> Array:
-        return g(t) + N_square(u)
-
-    u0 = u_exact(0.0)
+        return np.zeros_like(u0, dtype=float)
 
     return ManufacturedProblem(
         A=A,
         u_exact=u_exact,
         du_exact=du_exact,
-        N=N_square,
+        N=N,
+        b=b,
+        g=g,
+        u0=u0,
+    )
+
+
+def make_stiff_semilinear_problem(
+    A: Array,
+    u0: Optional[Array] = None,
+    beta: float = 0.1,
+    nonlinearity: str = "quadratic",
+) -> ManufacturedProblem:
+    """
+        u'(t) = A u(t) + g(t) + N(u(t))
+
+    Choose exact solution:
+        u_exact(t) = exp(tA) u0
+    so that u_exact'(t) = A u_exact(t).
+
+    Then choose forcing:
+        g(t) = -N(u_exact(t))
+
+    Hence:
+        u_exact'(t) = A u_exact(t) + g(t) + N(u_exact(t))
+                    = A u_exact(t) - N(u_exact(t)) + N(u_exact(t))
+                    = A u_exact(t)
+
+    Key advantage:
+        g(t) does NOT contain -A u_exact(t), so it does not blow up with stiffness.
+    """
+
+    A = np.array(A, dtype=float)
+    if u0 is None:
+        u0 = np.ones(A.shape[0], dtype=float)
+
+    if nonlinearity.lower() == "quadratic":
+        N_base = N_quadratic
+    elif nonlinearity.lower() == "sine":
+        N_base = N_sine
+    else:
+        raise ValueError("nonlinearity must be 'quadratic' or 'sine'")
+
+    def N(u: Array) -> Array:
+        return beta * N_base(u)
+
+    def u_exact(t: float) -> Array:
+        return expm_via_eig(t, A) @ u0
+
+    def du_exact(t: float) -> Array:
+        return A @ u_exact(t)
+
+    def g(t: float) -> Array:
+        return -N(u_exact(t))
+
+    def b(t: float, u: Array) -> Array:
+        return g(t) + N(u)
+
+    return ManufacturedProblem(
+        A=A,
+        u_exact=u_exact,
+        du_exact=du_exact,
+        N=N,
         b=b,
         g=g,
         u0=u0,

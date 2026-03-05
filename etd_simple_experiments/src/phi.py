@@ -1,10 +1,9 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
+from matrices import check_symmetric
+from typing import Dict, Iterable, Optional
 import numpy as np
-from scipy.linalg import expm
-
 
 Array = np.ndarray
 
@@ -12,7 +11,7 @@ Array = np.ndarray
 def _phi_scalar_series(z: float, k: int, terms: int = 12) -> float:
     """
     Series for phi_k(z):
-      phi_k(z) = sum_{m=0}^\infty z^m / (m+k)!
+      phi_k(z) = sum_{m=0}^infty z^m / (m+k)!
     Accurate for small |z| and avoids cancellation near z=0.
     """
     denom = math.factorial(k)
@@ -48,10 +47,6 @@ def phi_scalar(z: float, k: int, small: float = 1e-8) -> float:
     return pk
 
 
-def _is_symmetric(A: Array, tol: float = 1e-12) -> bool:
-    return np.linalg.norm(A - A.T, ord=np.inf) <= tol
-
-
 def _phi_matrix_via_eig(A: Array, h: float, ks: Iterable[int]) -> Dict[int, Array]:
     """
     Compute phi_k(hA) by diagonalization.
@@ -64,7 +59,7 @@ def _phi_matrix_via_eig(A: Array, h: float, ks: Iterable[int]) -> Dict[int, Arra
 
     ks = sorted(set(int(k) for k in ks))
 
-    if _is_symmetric(A):
+    if check_symmetric(A):
         w, V = np.linalg.eigh(A)
         Vinv = V.T
     else:
@@ -84,46 +79,10 @@ def _phi_matrix_via_eig(A: Array, h: float, ks: Iterable[int]) -> Dict[int, Arra
     return out
 
 
-def _phi_matrix_via_block(A: Array, h: float, k_max: int) -> Dict[int, Array]:
-    """
-    General method (fallback): block-exponential technique.
-    Requires scipy.linalg.expm.
-
-    Constructs block matrix of size (k_max+1)*n, whose exponential contains phi_k blocks.
-    """
-
-    A = np.asarray(A, dtype=float)
-    n = A.shape[0]
-    m = k_max + 1
-    Z = np.zeros((m * n, m * n), dtype=float)
-
-    # Put hA on each diagonal block
-    for i in range(m):
-        Z[i * n : (i + 1) * n, i * n : (i + 1) * n] = h * A
-
-    # Put identity blocks on the first superdiagonal
-    iden = np.eye(n, dtype=float)
-    for i in range(m - 1):
-        Z[i * n : (i + 1) * n, (i + 1) * n : (i + 2) * n] = iden
-
-    EZ = expm(Z)
-
-    # Extract blocks: top row contains h^k * phi_k(hA)
-    out: Dict[int, Array] = {}
-    for k in range(m):
-        block = EZ[0:n, k * n : (k + 1) * n]
-        if k == 0:
-            out[0] = block  # exp(hA)
-        else:
-            out[k] = block / (h**k)
-    return out
-
-
 @dataclass
 class PhiCache:
     A: Array
     h: float
-    method: str = "auto"  # "auto" | "eig" | "block"
     _store: Optional[Dict[int, Array]] = None
 
     def get(self, ks: Iterable[int]) -> Dict[int, Array]:
@@ -135,19 +94,7 @@ class PhiCache:
         if not missing:
             return {k: self._store[k] for k in ks}
 
-        if self.method not in ("auto", "eig", "block"):
-            raise ValueError("method must be 'auto', 'eig', or 'block'")
-
-        use_eig = (self.method == "eig") or (self.method == "auto")
-        if use_eig:
-            computed = _phi_matrix_via_eig(self.A, self.h, missing)
-        else:
-            computed = {}
-
-        if self.method == "block":
-            kmax = max(missing)
-            computed = _phi_matrix_via_block(self.A, self.h, kmax)
-            computed = {k: computed[k] for k in missing}
+        computed = _phi_matrix_via_eig(self.A, self.h, missing)
 
         self._store.update(computed)
         return {k: self._store[k] for k in ks}

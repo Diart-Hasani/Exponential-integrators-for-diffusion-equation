@@ -26,7 +26,9 @@ def _as_vec(u: Array) -> Array:
     return u
 
 
-def etd1_step(u: Array, t: float, h: float, A: Array, b: BFunc, cache: PhiCache) -> Array:
+def etd1_step(
+    u: Array, t: float, h: float, A: Array, b: BFunc, cache: PhiCache
+) -> Array:
     u = _as_vec(u)
     mats = cache.get([0, 1])
     E = mats[0]
@@ -48,7 +50,7 @@ def etd1_solve(
     A = np.asarray(A, dtype=float)
 
     if cache is None:
-        cache = PhiCache(A=A, h=h, method="auto")
+        cache = PhiCache(A=A, h=h)
 
     # Build time grid with last step adjusted if T-t0 not multiple of h
     times = [float(t0)]
@@ -61,7 +63,7 @@ def etd1_solve(
     while t < T - 1e-15:
         h_step = min(h, T - t)
         if abs(h_step - h) > 0:
-            local_cache = PhiCache(A=A, h=h_step, method=cache.method)
+            local_cache = PhiCache(A=A, h=h_step)
         else:
             local_cache = cache
 
@@ -76,7 +78,9 @@ def etd1_solve(
     return SolverResult(t=t_arr, u=u_arr, h=h, n_steps=len(times) - 1)
 
 
-def etdrk2_step(u: Array, t: float, h: float, A: Array, b: BFunc, cache: PhiCache) -> Array:
+def etdrk2_step(
+    u: Array, t: float, h: float, A: Array, b: BFunc, cache: PhiCache
+) -> Array:
     u = _as_vec(u)
     mats = cache.get([0, 1, 2])
     E = mats[0]
@@ -100,12 +104,12 @@ def etdrk2_solve(
     b: BFunc,
     cache: Optional[PhiCache] = None,
 ) -> SolverResult:
-    
+
     u0 = _as_vec(u0)
     A = np.asarray(A, dtype=float)
 
     if cache is None:
-        cache = PhiCache(A=A, h=h, method="auto")
+        cache = PhiCache(A=A, h=h)
 
     times = [float(t0)]
     us = [u0.copy()]
@@ -116,7 +120,7 @@ def etdrk2_solve(
     while t < T - 1e-15:
         h_step = min(h, T - t)
         if abs(h_step - h) > 0:
-            local_cache = PhiCache(A=A, h=h_step, method=cache.method)
+            local_cache = PhiCache(A=A, h=h_step)
         else:
             local_cache = cache
 
