@@ -18,6 +18,53 @@ def N_quadratic(u: Array) -> Array:
 def N_sine(u: Array) -> Array:
     return np.sin(u)
 
+# Experiment with different solution
+def get_exact_solution(kind: str):
+    if kind == "mixed_decay":
+        def u_exact(t):
+            return np.array([
+                np.exp(-2*t) * np.cos(2*t),
+                np.exp(-2*t) * np.sin(2*t)
+            ])
+
+        def du_exact(t):
+            return np.array([
+                -2*np.exp(-2*t)*np.cos(2*t) 
+                -2*np.exp(-2*t)*np.sin(2*t),
+                -2*np.exp(-2*t)*np.sin(2*t)
+                +2*np.exp(-2*t)*np.cos(2*t)
+            ])
+
+    elif kind == "oscillatory":
+        # Strong time variation -> harder for ETD1
+        def u_exact(t):
+            return np.array([
+                np.exp(-t)*np.cos(3*t),
+                np.exp(-t)*np.sin(2*t)
+            ])
+
+        def du_exact(t):
+            return np.array([
+                -np.exp(-t)*np.cos(3*t) - 3*np.exp(-t)*np.sin(3*t),
+                -np.exp(-t)*np.sin(2*t) + 2*np.exp(-t)*np.cos(2*t)
+            ])
+
+    elif kind == "stiffer_exact":
+        # Faster decay modes -> more stiffness
+        def u_exact(t):
+            return np.array([
+                np.exp(-5*t),
+                np.exp(-t)*np.cos(t)
+            ])
+
+        def du_exact(t):
+            return np.array([
+                -5*np.exp(-5*t),
+                -np.exp(-t)*np.cos(t) - np.exp(-t)*np.sin(t)
+            ])
+
+    return u_exact, du_exact
+
 
 @dataclass(frozen=True)
 class ManufacturedProblem:
@@ -67,24 +114,18 @@ def make_semilinear_problem(
     u0: Optional[Array] = None,
     beta: float = 0.1,
     nonlinearity: str = "quadratic",
+    kind: str = "oscillatory",
 ) -> ManufacturedProblem:
     """
+    Manufactured semilinear problem
+
         u'(t) = A u(t) + g(t) + N(u(t))
 
-    Choose exact solution:
-        u_exact(t) = exp(tA) u0
-    so that u_exact'(t) = A u_exact(t).
+    Choose exact solution u_exact(t), then define
 
-    Then choose forcing:
-        g(t) = -N(u_exact(t))
+        g(t) = u_exact'(t) - A u_exact(t) - N(u_exact(t))
 
-    Hence:
-        u_exact'(t) = A u_exact(t) + g(t) + N(u_exact(t))
-                    = A u_exact(t) - N(u_exact(t)) + N(u_exact(t))
-                    = A u_exact(t)
-
-    Key advantage:
-        g(t) does NOT contain -A u_exact(t), so it does not blow up with stiffness.
+    so that u_exact satisfies the equation exactly.
     """
 
     A = np.array(A, dtype=float)
@@ -99,14 +140,12 @@ def make_semilinear_problem(
     def N(u: Array) -> Array:
         return beta * N_base(u)
 
-    def u_exact(t: float) -> Array:
-        return expm_via_eig(t, A) @ u0
-
-    def du_exact(t: float) -> Array:
-        return A @ u_exact(t)
+    # Pick exact solution
+    u_exact, du_exact = get_exact_solution(kind=kind)
 
     def g(t: float) -> Array:
-        return -N(u_exact(t))
+        uex = u_exact(t)
+        return du_exact(t) - A @ uex - N(uex)
 
     def b(t: float, u: Array) -> Array:
         return g(t) + N(u)
@@ -118,5 +157,5 @@ def make_semilinear_problem(
         N=N,
         b=b,
         g=g,
-        u0=u0,
+        u0=u_exact(0.0),
     )
