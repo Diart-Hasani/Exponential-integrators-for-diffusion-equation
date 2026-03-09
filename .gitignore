@@ -54,3 +54,5 @@ models/*
 # Project notes
 # =====================
 project_goal.txt
+results/
+docs/code_help.txt

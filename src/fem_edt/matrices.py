@@ -1,7 +1,7 @@
 import numpy as np
 
 def matrix_2x2(alpha: float = 1.0) -> np.ndarray:
-    A = np.array([[-2.0, 1.0], [1.0, -20.0]])
+    A = np.array([[-2.0, 1.0], [1.0, -200.0]])
     return alpha * A
 
 

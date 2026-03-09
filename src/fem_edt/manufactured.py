@@ -30,7 +30,7 @@ class ManufacturedProblem:
     u0: Array
 
 
-def make_stiff_linear_problem(
+def make_linear_problem(
     A: Array, u0: Optional[Array] = None
 ) -> ManufacturedProblem:
     """
@@ -48,27 +48,21 @@ def make_stiff_linear_problem(
     def du_exact(t: float) -> Array:
         return A @ u_exact(t)
 
-    def N(u: Array) -> Array:
+    def zero_array(t: Optional[float] = None, u: Array = None) -> Array:
         return np.zeros_like(u, dtype=float)
-
-    def g(t: float) -> Array:
-        return np.zeros_like(u0, dtype=float)
-
-    def b(t: float, u: Array) -> Array:
-        return np.zeros_like(u0, dtype=float)
 
     return ManufacturedProblem(
         A=A,
         u_exact=u_exact,
         du_exact=du_exact,
-        N=N,
-        b=b,
-        g=g,
+        N=zero_array,
+        b=zero_array,
+        g=zero_array,
         u0=u0,
     )
 
 
-def make_stiff_semilinear_problem(
+def make_semilinear_problem(
     A: Array,
     u0: Optional[Array] = None,
     beta: float = 0.1,
@@ -97,12 +91,10 @@ def make_stiff_semilinear_problem(
     if u0 is None:
         u0 = np.ones(A.shape[0], dtype=float)
 
-    if nonlinearity.lower() == "quadratic":
-        N_base = N_quadratic
-    elif nonlinearity.lower() == "sine":
+    if nonlinearity.lower() == "sine":
         N_base = N_sine
     else:
-        raise ValueError("nonlinearity must be 'quadratic' or 'sine'")
+        N_base = N_quadratic
 
     def N(u: Array) -> Array:
         return beta * N_base(u)

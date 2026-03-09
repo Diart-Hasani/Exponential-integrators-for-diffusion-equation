@@ -2,19 +2,19 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from etd_simple_experiments.src.matrices import matrix_2x2
-from etd_simple_experiments.src.manufactured import make_stiff_linear_problem
-from etd_simple_experiments.src.etd_methods import etd1_solve
+from src.fem_edt.matrices import matrix_2x2
+from src.fem_edt.manufactured import make_linear_problem
+from src.fem_edt.etd1 import etd1_solve
 
 
 def main() -> None:
-    alpha = 100.0  # mild stiffness (try 50.0 later for stiff)
+    alpha = 100.0
     t0 = 0.0
     T = 10.0
     h = 0.1
 
     A = matrix_2x2(alpha=alpha)
-    problem = make_stiff_linear_problem(A)
+    problem = make_linear_problem(A)
     
     res = etd1_solve(
         u0=problem.u0,
@@ -43,7 +43,7 @@ def main() -> None:
     plt.title("Component u1: ETD1 vs exact")
     plt.legend()
     plt.grid(True)
-    plt.savefig("etd_simple_experiments/results/etd1/u1.png", dpi=300)
+    plt.savefig("results/etd1/u1.png", dpi=300)
 
     plt.figure()
     plt.plot(ts, u_ex[:, 1], label="exact u2")
@@ -53,7 +53,7 @@ def main() -> None:
     plt.title("Component u2: ETD1 vs exact")
     plt.legend()
     plt.grid(True)
-    plt.savefig("etd_simple_experiments/results/etd1/u2.png", dpi=300)
+    plt.savefig("results/etd1/u2.png", dpi=300)
 
     plt.figure()
     plt.plot(ts, err[:, 0], label="|error u1|")
@@ -65,7 +65,7 @@ def main() -> None:
     plt.legend()
     plt.grid(True, which="both")
 
-    plt.savefig("etd_simple_experiments/results/etd1/error_comparison.png", dpi=300)
+    plt.savefig("results/etd1/error_comparison.png", dpi=300)
 
 
 if __name__ == "__main__":
