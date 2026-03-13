@@ -18,50 +18,58 @@ def N_quadratic(u: Array) -> Array:
 def N_sine(u: Array) -> Array:
     return np.sin(u)
 
+
 # Experiment with different solution
 def get_exact_solution(kind: str):
     if kind == "mixed_decay":
+
         def u_exact(t):
-            return np.array([
-                np.exp(-2*t) * np.cos(2*t),
-                np.exp(-2*t) * np.sin(2*t)
-            ])
+            return np.array(
+                [np.exp(-t) * np.cos(2 * t), np.exp(-5 * t) * np.cos(2 * t)]
+            )
 
         def du_exact(t):
-            return np.array([
-                -2*np.exp(-2*t)*np.cos(2*t) 
-                -2*np.exp(-2*t)*np.sin(2*t),
-                -2*np.exp(-2*t)*np.sin(2*t)
-                +2*np.exp(-2*t)*np.cos(2*t)
-            ])
+            return np.array(
+                [
+                    -np.exp(-t) * np.cos(2 * t)
+                    - 2 * np.exp(-t) * np.sin(2 * t),
+                    -5 * np.exp(-5 * t) * np.cos(2 * t)
+                    - 2 * np.exp(-5 * t) * np.sin(2 * t),
+                ]
+            )
 
     elif kind == "oscillatory":
         # Strong time variation -> harder for ETD1
         def u_exact(t):
-            return np.array([
-                np.exp(-t)*np.cos(3*t),
-                np.exp(-t)*np.sin(2*t)
-            ])
+            return np.array([np.exp(-t) * np.cos(3 * t), np.exp(-t) * np.sin(2 * t)])
 
         def du_exact(t):
-            return np.array([
-                -np.exp(-t)*np.cos(3*t) - 3*np.exp(-t)*np.sin(3*t),
-                -np.exp(-t)*np.sin(2*t) + 2*np.exp(-t)*np.cos(2*t)
-            ])
+            return np.array(
+                [
+                    -np.exp(-t) * np.cos(3 * t) - 3 * np.exp(-t) * np.sin(3 * t),
+                    -np.exp(-t) * np.sin(2 * t) + 2 * np.exp(-t) * np.cos(2 * t),
+                ]
+            )
 
     elif kind == "stiffer_exact":
         # Faster decay modes -> more stiffness
         def u_exact(t):
-            return np.array([
-                np.exp(-5*t),
-                np.exp(-t)*np.cos(t)
-            ])
+            return np.array([np.exp(-10 * t), np.exp(-t)])
 
         def du_exact(t):
-            return np.array([
-                -5*np.exp(-5*t),
-                -np.exp(-t)*np.cos(t) - np.exp(-t)*np.sin(t)
-            ])
+            return np.array(
+                [-10 * np.exp(-10 * t), -np.exp(-t)]
+            )
+
+    elif kind == "pure_trig":
+        # Pure trigonometric
+        def u_exact(t):
+            return np.array([np.sin(10*t), np.cos(10*t)])
+
+        def du_exact(t):
+            return np.array(
+                [10*np.cos(10*t) , - 10*np.sin(10*t)]
+            )
 
     return u_exact, du_exact
 
@@ -77,9 +85,7 @@ class ManufacturedProblem:
     u0: Array
 
 
-def make_linear_problem(
-    A: Array, u0: Optional[Array] = None
-) -> ManufacturedProblem:
+def make_linear_problem(A: Array, u0: Optional[Array] = None) -> ManufacturedProblem:
     """
         u'(t) = A u(t)
     Exact solution:
@@ -112,7 +118,7 @@ def make_linear_problem(
 def make_semilinear_problem(
     A: Array,
     u0: Optional[Array] = None,
-    beta: float = 0.1,
+    beta: float = 1,  # Size of nonlinear term.
     nonlinearity: str = "quadratic",
     kind: str = "oscillatory",
 ) -> ManufacturedProblem:
