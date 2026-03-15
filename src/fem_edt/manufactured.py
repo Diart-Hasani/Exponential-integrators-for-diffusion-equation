@@ -11,14 +11,6 @@ def expm_via_eig(t: float, A: Array) -> Array:
     return (vecs @ np.diag(np.exp(t * vals)) @ Vinv).real
 
 
-def N_quadratic(u: Array) -> Array:
-    return np.array([u[0] ** 2, u[1] ** 2], dtype=float)
-
-
-def N_sine(u: Array) -> Array:
-    return np.sin(u)
-
-
 # Experiment with different solution
 def get_exact_solution(kind: str):
     if kind == "mixed_decay":
@@ -40,14 +32,17 @@ def get_exact_solution(kind: str):
 
     elif kind == "oscillatory":
         # Strong time variation -> harder for ETD1
+        b = 0.3
+        c1 = 5
+        c2 = 5
         def u_exact(t):
-            return np.array([np.exp(-t) * np.cos(3 * t), np.exp(-t) * np.sin(2 * t)])
+            return np.array([np.exp(-b*t) * np.cos(c1 * t), np.exp(-b*t) * np.sin(c2 * t)])
 
         def du_exact(t):
             return np.array(
                 [
-                    -np.exp(-t) * np.cos(3 * t) - 3 * np.exp(-t) * np.sin(3 * t),
-                    -np.exp(-t) * np.sin(2 * t) + 2 * np.exp(-t) * np.cos(2 * t),
+                    -b* np.exp(-b*t) * np.cos(c1 * t) - c1 * np.exp(-b*t) * np.sin(c1 * t),
+                    -b* np.exp(-b*t) * np.sin(c2 * t) + c2 * np.exp(-b*t) * np.cos(c2 * t),
                 ]
             )
 
@@ -63,12 +58,13 @@ def get_exact_solution(kind: str):
 
     elif kind == "pure_trig":
         # Pure trigonometric
+        c = 3
         def u_exact(t):
-            return np.array([np.sin(10*t), np.cos(10*t)])
+            return np.array([np.sin(c*t), np.cos(c*t)])
 
         def du_exact(t):
             return np.array(
-                [10*np.cos(10*t) , - 10*np.sin(10*t)]
+                [c*np.cos(c*t) , - c*np.sin(c*t)]
             )
 
     return u_exact, du_exact
@@ -119,7 +115,6 @@ def make_semilinear_problem(
     A: Array,
     u0: Optional[Array] = None,
     beta: float = 1,  # Size of nonlinear term.
-    nonlinearity: str = "quadratic",
     kind: str = "oscillatory",
 ) -> ManufacturedProblem:
     """
@@ -138,13 +133,8 @@ def make_semilinear_problem(
     if u0 is None:
         u0 = np.ones(A.shape[0], dtype=float)
 
-    if nonlinearity.lower() == "sine":
-        N_base = N_sine
-    else:
-        N_base = N_quadratic
-
     def N(u: Array) -> Array:
-        return beta * N_base(u)
+        return beta * np.sin(u)
 
     # Pick exact solution
     u_exact, du_exact = get_exact_solution(kind=kind)

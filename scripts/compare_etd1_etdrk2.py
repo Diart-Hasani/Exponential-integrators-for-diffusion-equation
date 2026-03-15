@@ -49,12 +49,13 @@ def main() -> None:
     alpha = 1.0
     ratio = 1.0
     t0 = 0.0
-    T = 5.0
+    T = 20.0
     h = 0.1
 
     A = matrix_2x2(alpha=alpha, ratio=ratio)
-    # Choos kind = "oscillatory", "mixed_decay", or "stiffer_exact" or "pure_trig"
-    problem = make_semilinear_problem(A, kind="pure_trig")
+    # Choose nonlinearity = "sine" or "quadratic"
+    # Choos kind = "oscillatory", "mixed_decay", "stiffer_exact" or "pure_trig"
+    problem = make_semilinear_problem(A, beta=1, kind="oscillatory")
 
     res_etd1 = etd1_solve(
         u0=problem.u0,

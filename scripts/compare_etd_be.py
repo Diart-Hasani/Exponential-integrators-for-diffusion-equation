@@ -10,11 +10,12 @@ from src.fem_edt.be import backward_euler_solve
 
 def main() -> None:
     alpha = 1.0
+    ratio = 10.0
     t0 = 0.0
     T = 10.0
     h = 0.1
 
-    A = matrix_2x2(alpha=alpha)
+    A = matrix_2x2(alpha=alpha, ratio=ratio)
     problem = make_linear_problem(A)
 
     res_etd1 = etd1_solve(
@@ -55,6 +56,7 @@ def main() -> None:
     plt.plot(ts, u_ex[:, 0], "k", label="exact u1")
     plt.plot(ts, u_etd1[:, 0], "--", label="ETD1 u1")
     plt.plot(ts, u_be[:, 0], ":", label="BE u1")
+    plt.xlim([0,3])
     plt.xlabel("t")
     plt.ylabel("u1(t)")
     plt.title("u1: exact vs ETD1 vs BE")
@@ -67,6 +69,7 @@ def main() -> None:
     plt.plot(ts, u_ex[:, 1], "k", label="exact u2")
     plt.plot(ts, u_etd1[:, 1], "--", label="ETD1 u2")
     plt.plot(ts, u_be[:, 1], ":", label="BE u2")
+    plt.xlim([0,1])
     plt.xlabel("t")
     plt.ylabel("u2(t)")
     plt.title("u2: exact vs ETD1 vs BE")
