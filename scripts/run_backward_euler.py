@@ -2,9 +2,9 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.fem_edt.matrices import matrix_2x2
-from src.fem_edt.manufactured import make_linear_problem
-from src.fem_edt.be import backward_euler_solve
+from src.etd.matrices import matrix_2x2
+from src.etd.manufactured import make_linear_problem
+from src.etd.be import backward_euler_solve
 
 
 def main() -> None:

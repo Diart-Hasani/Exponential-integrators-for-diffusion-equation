@@ -33,8 +33,8 @@ def get_exact_solution(kind: str):
     elif kind == "oscillatory":
         # Strong time variation -> harder for ETD1
         b = 0.3
-        c1 = 5
-        c2 = 5
+        c1 = 10
+        c2 = 10
         def u_exact(t):
             return np.array([np.exp(-b*t) * np.cos(c1 * t), np.exp(-b*t) * np.sin(c2 * t)])
 
@@ -134,7 +134,7 @@ def make_semilinear_problem(
         u0 = np.ones(A.shape[0], dtype=float)
 
     def N(u: Array) -> Array:
-        return beta * np.sin(u)
+        return beta * np.cos(u)
 
     # Pick exact solution
     u_exact, du_exact = get_exact_solution(kind=kind)

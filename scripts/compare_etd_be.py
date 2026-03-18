@@ -2,10 +2,10 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.fem_edt.matrices import matrix_2x2
-from src.fem_edt.manufactured import make_linear_problem
-from src.fem_edt.etd1 import etd1_solve
-from src.fem_edt.be import backward_euler_solve
+from src.etd.matrices import matrix_2x2
+from src.etd.manufactured import make_linear_problem
+from src.etd.etd1 import etd1_solve
+from src.etd.be import backward_euler_solve
 
 
 def main() -> None:
@@ -51,31 +51,34 @@ def main() -> None:
     print(f"ETD1 max abs error overall: {np.max(err_etd1)}")
     print(f"BE   max abs error overall: {np.max(err_be)}")
 
-    # u1
-    plt.figure()
-    plt.plot(ts, u_ex[:, 0], "k", label="exact u1")
-    plt.plot(ts, u_etd1[:, 0], "--", label="ETD1 u1")
-    plt.plot(ts, u_be[:, 0], ":", label="BE u1")
-    plt.xlim([0,3])
-    plt.xlabel("t")
-    plt.ylabel("u1(t)")
-    plt.title("u1: exact vs ETD1 vs BE")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("results/compare_etd_be/u1_compare.png", dpi=300)
+    # u1 and u2 plots
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
 
-    # u2
-    plt.figure()
-    plt.plot(ts, u_ex[:, 1], "k", label="exact u2")
-    plt.plot(ts, u_etd1[:, 1], "--", label="ETD1 u2")
-    plt.plot(ts, u_be[:, 1], ":", label="BE u2")
-    plt.xlim([0,1])
-    plt.xlabel("t")
-    plt.ylabel("u2(t)")
-    plt.title("u2: exact vs ETD1 vs BE")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("results/compare_etd_be/u2_compare.png", dpi=300)
+    # left plot: u1
+    axes[0].plot(ts, u_ex[:, 0], "k", label="exact u1")
+    axes[0].plot(ts, u_etd1[:, 0], "--", label="ETD1 u1")
+    axes[0].plot(ts, u_be[:, 0], ":", label="BE u1")
+    axes[0].set_xlim([0, 3])
+    axes[0].set_xlabel("t")
+    axes[0].set_ylabel("u1(t)")
+    axes[0].set_title("u1: exact vs ETD1 vs BE")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    # right plot: u2
+    axes[1].plot(ts, u_ex[:, 1], "k", label="exact u2")
+    axes[1].plot(ts, u_etd1[:, 1], "--", label="ETD1 u2")
+    axes[1].plot(ts, u_be[:, 1], ":", label="BE u2")
+    axes[1].set_xlim([0, 1])
+    axes[1].set_xlabel("t")
+    axes[1].set_ylabel("u2(t)")
+    axes[1].set_title("u2: exact vs ETD1 vs BE")
+    axes[1].legend()
+    axes[1].grid(True)
+
+    fig.tight_layout()
+    fig.savefig("results/compare_etd_be/u1_u2_compare.png", dpi=300)
+    plt.close(fig)
 
     # error norms
     plt.figure()
@@ -89,19 +92,35 @@ def main() -> None:
     plt.grid(True, which="both")
     plt.savefig("results/compare_etd_be/error_norm_compare.png", dpi=300)
 
-    # componentwise errors
-    plt.figure()
-    plt.plot(ts, err_etd1[:, 0], "--", label="|e1| ETD1")
-    plt.plot(ts, err_etd1[:, 1], "--", label="|e2| ETD1")
-    plt.plot(ts, err_be[:, 0], ":", label="|e1| BE")
-    plt.plot(ts, err_be[:, 1], ":", label="|e2| BE")
-    plt.xlabel("t")
-    plt.ylabel("absolute error")
-    plt.title("Componentwise error: ETD1 vs BE")
-    plt.yscale("log")
-    plt.legend()
-    plt.grid(True, which="both")
-    plt.savefig("results/compare_etd_be/error_components_compare.png", dpi=300)
+    # componentwise errors in one figure
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # left plot: e1
+    axes[0].plot(ts, err_etd1[:, 0], "--", label="|e1| ETD1")
+    axes[0].plot(ts, err_be[:, 0], ":", label="|e1| BE")
+    axes[0].set_xlabel("t")
+    axes[0].set_ylabel("absolute error")
+    axes[0].set_title("Component 1 error")
+    axes[0].set_yscale("log")
+    axes[0].set_ylim([10**(-18), 10**1])
+    axes[0].legend()
+    axes[0].grid(True, which="both")
+
+    # right plot: e2
+    axes[1].plot(ts, err_etd1[:, 1], "--", label="|e2| ETD1")
+    axes[1].plot(ts, err_be[:, 1], ":", label="|e2| BE")
+    axes[1].set_xlabel("t")
+    axes[1].set_ylabel("absolute error")
+    axes[1].set_title("Component 2 error")
+    axes[1].set_yscale("log")
+    axes[1].set_ylim([10**(-18), 10**1])
+    axes[1].legend()
+    axes[1].grid(True, which="both")
+
+    fig.suptitle("Componentwise error: ETD1 vs BE")
+    fig.tight_layout()
+    fig.savefig("results/compare_etd_be/error_components_compare.png", dpi=300)
+    plt.close(fig)
 
 
 if __name__ == "__main__":
