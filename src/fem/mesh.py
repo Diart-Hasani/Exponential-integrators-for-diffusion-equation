@@ -65,12 +65,25 @@ def rectangle_mesh(nx: int, ny: int, lx: float = 1.0, ly: float = 1.0) -> Mesh2D
         boundary_tags=boundary_tags,
     )
 
+def boundary_nodes(mesh: Mesh2D, tags: set[str] | None = None) -> np.ndarray:
+    """
+    Return sorted unique boundary node indices.
+    If tags is None, use all boundary nodes.
+    """
+    chosen_nodes = []
+
+    for edge, tag in zip(mesh.boundary_edges, mesh.boundary_tags):
+        if tags is None or tag in tags:
+            chosen_nodes.extend(edge.tolist())
+
+    return np.array(sorted(set(chosen_nodes)), dtype=int)
 
 def plot_mesh(
     mesh: Mesh2D,
     show_element_numbers: bool = True,
     show_element_color: bool = True,
     show_node_numbers: bool = False,
+    save_path: str | None = None
 ) -> None:
     fig, ax = plt.subplots()
 
@@ -108,4 +121,5 @@ def plot_mesh(
     ax.set_title("Triangulated mesh")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    plt.show()
+    plt.savefig(save_path, dpi=300)
+    plt.close(fig)
