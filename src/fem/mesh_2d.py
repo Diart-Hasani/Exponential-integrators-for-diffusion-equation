@@ -65,6 +65,7 @@ def rectangle_mesh(nx: int, ny: int, lx: float = 1.0, ly: float = 1.0) -> Mesh2D
         boundary_tags=boundary_tags,
     )
 
+
 def boundary_nodes(mesh: Mesh2D, tags: set[str] | None = None) -> np.ndarray:
     """
     Return sorted unique boundary node indices.
@@ -78,12 +79,13 @@ def boundary_nodes(mesh: Mesh2D, tags: set[str] | None = None) -> np.ndarray:
 
     return np.array(sorted(set(chosen_nodes)), dtype=int)
 
+
 def plot_mesh(
     mesh: Mesh2D,
     show_element_numbers: bool = True,
     show_element_color: bool = True,
     show_node_numbers: bool = False,
-    save_path: str | None = None
+    save_path: str | None = None,
 ) -> None:
     fig, ax = plt.subplots()
 

@@ -5,8 +5,8 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 from scipy.sparse.linalg import spsolve
 
-from fem.mesh import rectangle_mesh, plot_mesh, boundary_nodes
-from fem.fem_assembly import assemble_matrices, apply_dirichlet_bc_matrix_rhs
+from fem.mesh_2d import rectangle_mesh, plot_mesh, boundary_nodes
+from fem.fem2d_assembly import assemble_matrices, apply_dirichlet_bc_matrix_rhs
 
 
 def initial_condition(x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     plot_mesh(
         mesh_for_plot,
         show_node_numbers=False,
-        show_element_numbers=False,
+        show_element_numbers=True,
         show_element_color=False,
         save_path=os.path.join(output_dir, "mesh_plot.png"),
     )

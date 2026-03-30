@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from fem.mesh import Mesh2D
+from fem.mesh_2d import Mesh2D
 
 
 def triangle_area(coords: np.ndarray) -> float:

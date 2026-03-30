@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import solve
 
-from fem.mesh import rectangle_mesh, boundary_nodes
-from fem.fem_assembly import assemble_matrices
+from fem.mesh_2d import rectangle_mesh, boundary_nodes
+from fem.fem2d_assembly import assemble_matrices
 
 from etd.be import backward_euler_solve
 from etd.etd1 import etd1_solve
