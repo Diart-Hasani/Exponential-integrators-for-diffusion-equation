@@ -2,20 +2,19 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib import colors
 
-from scipy.sparse.linalg import spsolve
-
+from time_diff.be import backward_euler_solve
+from time_diff.etd1 import etd1_solve
 from fem.mesh_2d import rectangle_mesh, plot_mesh, boundary_nodes
-from fem.fem2d_assembly import assemble_matrices, apply_dirichlet_bc_matrix_rhs
+from fem.fem2d_assembly import assemble_matrices
 
 
 def initial_condition(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """
     Initial value v(x,y).
     """
-    # ini_con = np.cos(np.pi * x) * np.sin(np.pi * y)
-    ini_con = 0.1*x + np.ones_like(y)
-    #
+    ini_con = np.sin(np.pi * x) * np.sin(np.pi * y)
     return ini_con
 
 
@@ -79,6 +78,7 @@ def animate_solution_3d(
 
     zmin = min(np.min(u) for u in u_snapshots)
     zmax = max(np.max(u) for u in u_snapshots)
+    norm = colors.Normalize(vmin=zmin, vmax=zmax)
 
     def update(k):
         ax.clear()
@@ -89,6 +89,7 @@ def animate_solution_3d(
             u_snapshots[k],
             triangles=mesh.elements,
             cmap="viridis",
+            norm=norm,
             edgecolor="k",
             linewidth=0.2,
         )
@@ -102,7 +103,7 @@ def animate_solution_3d(
         return (surf,)
 
     anim = FuncAnimation(fig, update, frames=len(u_snapshots), interval=200, blit=False)
-    anim.save(save_path, writer=PillowWriter(fps=20))
+    anim.save(save_path, writer=PillowWriter(fps=10))
     plt.close(fig)
 
 
@@ -112,7 +113,7 @@ def solve_heat_equation_backward_euler(
     ny: int = 20,
     lx: float = 1.0,
     ly: float = 1.0,
-    T: float = 1,
+    T: float = 1.0,
     dt: float = 0.1,
     n_snapshots: int = 20,
 ):
@@ -122,69 +123,115 @@ def solve_heat_equation_backward_euler(
         u = g               on boundary
         u(x,0) = v(x)       in Omega
 
-    with P1 FEM in space and Backward Euler in time:
-        (M + dt K) U^{n+1} = M U^n + dt F^{n+1}
+    with P1 FEM in space and Backward Euler in time on interior nodes:
+        M_ii U'_i + K_ii U_i = F_i
+    rewritten as
+        U'_i = A U_i + b(t, U_i),   A = -M_ii^{-1} K_ii.
     """
-
-    # Mesh and matrices
     mesh = rectangle_mesh(nx=nx, ny=ny, lx=lx, ly=ly)
     M, K = assemble_matrices(mesh)
 
     x = mesh.nodes[:, 0]
     y = mesh.nodes[:, 1]
 
+    all_nodes = np.arange(mesh.nodes.shape[0])
     bd_nodes = boundary_nodes(mesh)
+    interior = np.setdiff1d(all_nodes, bd_nodes)
 
-    # Initial condition
-    U = initial_condition(x, y)
+    Mii = M[interior][:, interior].toarray()
+    Kii = K[interior][:, interior].toarray()
 
-    # Enforce boundary values at t=0
-    g0 = dirichlet_value(x[bd_nodes], y[bd_nodes], t=0.0)
-    U[bd_nodes] = g0
+    A = -np.linalg.solve(Mii, Kii)
 
-    # Time-stepping setup
-    n_steps = int(round(T / dt))
-    times = np.linspace(0.0, T, n_steps + 1)
+    x_int = x[interior]
+    y_int = y[interior]
 
-    # For saving evolution info
-    max_values = [np.max(np.abs(U))]
+    def b(t: float, u: np.ndarray) -> np.ndarray:
+        fvals = source_term(x_int, y_int, t)
+        F = Mii @ fvals
+        return np.linalg.solve(Mii, F)
 
-    # Snapshots
-    snapshot_indices = np.linspace(0, n_steps, n_snapshots, dtype=int)
+    u0_full = initial_condition(x, y)
+    u0 = u0_full[interior]
 
-    u_snapshots = [U.copy()]
-    snapshot_times = [0.0]
+    res = backward_euler_solve(
+        u0=u0,
+        t0=0.0,
+        T=T,
+        h=dt,
+        A=A,
+        b=b,
+    )
 
-    # Backward Euler loop
-    for n in range(n_steps):
-        t_np1 = times[n + 1]
+    u_full = np.zeros((res.u.shape[0], mesh.nodes.shape[0]), dtype=float)
+    u_full[:, interior] = res.u
 
-        # Approximate load vector.
-        # Better later: assemble true FEM load vector elementwise.
-        f_nodal = build_load_vector(mesh, t_np1)
-        F_np1 = M @ f_nodal
+    g_bd = dirichlet_value(x[bd_nodes], y[bd_nodes], 0.0)
+    u_full[:, bd_nodes] = g_bd
 
-        # System:
-        # (M + dt K) U^{n+1} = M U^n + dt F^{n+1}
-        A = M + dt * K
-        rhs = M @ U + dt * F_np1
+    max_values = np.max(np.abs(u_full), axis=1)
 
-        # Dirichlet boundary values at time t_{n+1}
-        g_np1 = dirichlet_value(x[bd_nodes], y[bd_nodes], t_np1)
+    return mesh, u_full, res.t, max_values
 
-        # Strongly impose BC
-        A_bc, rhs_bc = apply_dirichlet_bc_matrix_rhs(A, rhs, bd_nodes, g_np1)
+def solve_heat_etd1(
+    nx: int = 20,
+    ny: int = 20,
+    lx: float = 1.0,
+    ly: float = 1.0,
+    T: float = 1.0,
+    dt: float = 0.1,
+):
+    """
+    Solve
+        u_t - Delta u = f   in Omega x (0,T]
+        u = g               on boundary
+        u(x,0) = v(x)       in Omega
+    """
+    mesh = rectangle_mesh(nx=nx, ny=ny, lx=lx, ly=ly)
+    M, K = assemble_matrices(mesh)
 
-        # Solve linear system
-        U = spsolve(A_bc, rhs_bc)
+    x = mesh.nodes[:, 0]
+    y = mesh.nodes[:, 1]
 
-        if (n + 1) in snapshot_indices:
-            u_snapshots.append(U.copy())
-            snapshot_times.append(t_np1)
+    all_nodes = np.arange(mesh.nodes.shape[0])
+    bd_nodes = boundary_nodes(mesh)
+    interior = np.setdiff1d(all_nodes, bd_nodes)
 
-        max_values.append(np.max(np.abs(U)))
+    Mii = M[interior][:, interior].toarray()
+    Kii = K[interior][:, interior].toarray()
 
-    return mesh, u_snapshots, np.array(snapshot_times), times, np.array(max_values)
+    A = -np.linalg.solve(Mii, Kii)
+
+    x_int = x[interior]
+    y_int = y[interior]
+
+    def b(t: float, u: np.ndarray) -> np.ndarray:
+        fvals = source_term(x_int, y_int, t)
+        F = Mii @ fvals
+        return np.linalg.solve(Mii, F)
+
+    u0_full = initial_condition(x, y)
+    u0 = u0_full[interior]
+
+    res = etd1_solve(
+        u0=u0,
+        t0=0.0,
+        T=T,
+        h=dt,
+        A=A,
+        b=b,
+    )
+
+    u_full = np.zeros((res.u.shape[0], mesh.nodes.shape[0]), dtype=float)
+    u_full[:, interior] = res.u
+
+    g_bd = dirichlet_value(x[bd_nodes], y[bd_nodes], 0.0)
+    u_full[:, bd_nodes] = g_bd
+
+    max_values = np.max(np.abs(u_full), axis=1)
+
+    return mesh, u_full, res.t, max_values
+
 
 
 def plot_decay(times: np.ndarray, max_values: np.ndarray, save_path: str) -> None:
@@ -213,23 +260,50 @@ if __name__ == "__main__":
     )
 
     # Solve the heat equation
-    mesh, u_snapshots, snapshot_times, times, max_values = solve_heat_equation_backward_euler(
+    mesh, u, times, max_values = solve_heat_equation_backward_euler(
         nx=20,
         ny=20,
         lx=1.0,
         ly=1.0,
-        T=0.1,
+        T=0.2,
         dt=0.001,
-        n_snapshots=100,
     )
+
+    # snapshot_times = np.linspace(0.0, 0.1, 31)
+    snapshot_times = np.logspace(0, 0, 101) / 100 -0.01
+    snapshot_indices = [np.argmin(np.abs(times - t)) for t in snapshot_times]
+    u_snapshots = [u[i] for i in snapshot_indices]
+
 
     animate_solution_3d(
         mesh,
         u_snapshots,
         snapshot_times,
-        os.path.join(output_dir, "solution_animation.gif"),
+        os.path.join(output_dir, "solution_animation_be.gif"),
     )
 
+        # Solve the heat equation
+    mesh, u, times, max_values = solve_heat_etd1(
+        nx=20,
+        ny=20,
+        lx=1.0,
+        ly=1.0,
+        T=1,
+        dt=0.001,
+    )
+
+    # snapshot_times = np.linspace(0.0, 0.1, 31)
+    snapshot_times = np.logspace(0, 2, 101) / 100 -0.01
+    snapshot_indices = [np.argmin(np.abs(times - t)) for t in snapshot_times]
+    u_snapshots = [u[i] for i in snapshot_indices]
+
+
+    animate_solution_3d(
+        mesh,
+        u_snapshots,
+        snapshot_times,
+        os.path.join(output_dir, "solution_animation_etd1.gif"),
+    )
 
     # Plot time decay
     plot_decay(

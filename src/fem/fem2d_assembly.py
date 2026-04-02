@@ -81,8 +81,8 @@ def assemble_matrices(mesh: Mesh2D) -> tuple[sp.csr_matrix, sp.csr_matrix]:
                 mass_data.append(Me[a, b])
                 stiff_data.append(Ke[a, b])
 
-    M = sp.coo_matrix((mass_data, (rows, cols)), shape=(n_nodes, n_nodes)).tocsr()
-    K = sp.coo_matrix((stiff_data, (rows, cols)), shape=(n_nodes, n_nodes)).tocsr()
+    M = sp.coo_array((mass_data, (rows, cols)), shape=(n_nodes, n_nodes)).tocsr()
+    K = sp.coo_array((stiff_data, (rows, cols)), shape=(n_nodes, n_nodes)).tocsr()
 
     return M, K
 

@@ -6,9 +6,9 @@ from scipy.linalg import solve
 from fem.mesh_2d import rectangle_mesh, boundary_nodes
 from fem.fem2d_assembly import assemble_matrices
 
-from etd.be import backward_euler_solve
-from etd.etd1 import etd1_solve
-from etd.etdrk2 import etdrk2_solve
+from time_diff.be import backward_euler_solve
+from time_diff.etd1 import etd1_solve
+from time_diff.etdrk2 import etdrk2_solve
 
 
 # ------------------------------------------------------------

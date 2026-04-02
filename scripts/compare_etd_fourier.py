@@ -5,10 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from src.etd.etdrk2 import etdrk2_solve
+from src.time_diff.etd1 import etd1_solve
 from src.fem.mesh_1d import interval_mesh, boundary_nodes
 from src.fem.fem1d_assembly import assemble_matrices
-from src.etd.be import backward_euler_solve
+from src.time_diff.be import backward_euler_solve
 
 
 def u0_fun(x: np.ndarray) -> np.ndarray:
@@ -67,8 +67,17 @@ def fem_initial_vector(x_int: np.ndarray) -> np.ndarray:
     """Nodal interpolation of the initial condition."""
     return u0_fun(x_int)
 
+def add_boundaries(u_int: np.ndarray) -> np.ndarray:
+    """Add homogeneous Dirichlet values at x=0 and x=1."""
+    return np.concatenate(([0.0], u_int, [0.0]))
 
-def solve_fem_etdrk2(
+
+def l2_error_on_nodes(x: np.ndarray, e: np.ndarray) -> float:
+    """Nodal L2 error computed by trapezoidal rule."""
+    return np.sqrt(np.trapezoid(e**2, x))
+
+
+def solve_fem_etd1(
     n_elements: int,
     dt: float,
     T: float,
@@ -79,7 +88,7 @@ def solve_fem_etdrk2(
 
         M U'(t) + kappa K U(t) = 0
 
-    on the interior nodes using ETDRK2.
+    on the interior nodes using etd1.
     """
     mesh, interior, bd, Mii, Kii, x_full, x_int = build_reduced_system_1d(
         n_elements=n_elements,
@@ -92,7 +101,7 @@ def solve_fem_etdrk2(
     def b(t: float, u: np.ndarray) -> np.ndarray:
         return np.zeros_like(u)
 
-    sol = etdrk2_solve(
+    sol = etd1_solve(
         u0=u0,
         t0=0.0,
         T=T,
@@ -114,7 +123,7 @@ def solve_fem_be(
 
         M U'(t) + kappa K U(t) = 0
 
-    on the interior nodes using ETDRK2.
+    on the interior nodes using etd1.
     """
     mesh, interior, bd, Mii, Kii, x_full, x_int = build_reduced_system_1d(
         n_elements=n_elements,
@@ -138,15 +147,6 @@ def solve_fem_be(
 
     return mesh, interior, x_full, x_int, sol
 
-
-def add_boundaries(u_int: np.ndarray) -> np.ndarray:
-    """Add homogeneous Dirichlet values at x=0 and x=1."""
-    return np.concatenate(([0.0], u_int, [0.0]))
-
-
-def l2_error_on_nodes(x: np.ndarray, e: np.ndarray) -> float:
-    """Nodal L2 error computed by trapezoidal rule."""
-    return np.sqrt(np.trapezoid(e**2, x))
 
 def animate_solution_1d(
     x: np.ndarray,
@@ -172,7 +172,7 @@ def animate_solution_1d(
     ax.set_ylabel("u(x,t)")
     ax.grid(True, alpha=0.3)
 
-    line_num, = ax.plot([], [], "--", linewidth=2, label="FEM + ETDRK2")
+    line_num, = ax.plot([], [], "--", linewidth=2, label="FEM + etd1")
     if u_exact_snapshots is not None:
         line_ex, = ax.plot([], [], "-", linewidth=2, label="Fourier")
     else:
@@ -212,7 +212,7 @@ def error_calc(kappa: float = 1.0, T: float = 1.0, output_dir: str = None) -> No
 
     for i, n_el in enumerate(n_elements_list):
         for j, dt in enumerate(dt_list):
-            mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+            mesh, interior, x_full, x_int, sol = solve_fem_etd1(
                 n_elements=n_el,
                 dt=dt,
                 T=T,
@@ -285,7 +285,7 @@ def run_experiment():
     error_calc(kappa=kappa, T=T, output_dir=output_dir)
 
     # Make an animation
-    mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+    mesh, interior, x_full, x_int, sol = solve_fem_etd1(
         n_elements=50,
         dt=dt,
         T=T,
@@ -309,12 +309,12 @@ def run_experiment():
     # Plot the function for different times
     n_el_plot = 10
     dt_plot = 0.01
-    times_to_plot = [0.0, 0.01, 0.02, 0.04]
+    times_to_plot = [0.0, 0.02, 0.04, 0.08]
 
     fig1, ax1 = plt.subplots(figsize=(8, 5))
 
     for t_plot in times_to_plot:
-        mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+        mesh, interior, x_full, x_int, sol = solve_fem_be(
             n_elements=n_el_plot,
             dt=dt_plot,
             T=t_plot,
@@ -325,11 +325,11 @@ def run_experiment():
         u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=800)
 
         ax1.plot(x_full, u_ex, "-", linewidth=2, label=f"Fourier, t={t_plot:g}")
-        ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+ETDRK2, t={t_plot:g}")
+        ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+etd1, t={t_plot:g}")
 
     ax1.set_xlabel("x")
     ax1.set_ylabel("u(x,t)")
-    ax1.set_title("1D heat equation: Fourier vs FEM+ETDRK2")
+    ax1.set_title("1D heat equation: Fourier vs FEM+etd1")
     ax1.grid(True, alpha=0.3)
     ax1.legend(fontsize=8, ncol=2)
     fig1.tight_layout()

@@ -2,10 +2,10 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.etd.matrices import matrix_2x2
-from src.etd.manufactured import make_linear_problem
-from src.etd.etd1 import etd1_solve
-from src.etd.be import backward_euler_solve
+from src.time_diff.matrices import matrix_2x2
+from src.time_diff.manufactured import make_linear_problem
+from src.time_diff.etd1 import etd1_solve
+from src.time_diff.be import backward_euler_solve
 
 
 def main() -> None:
