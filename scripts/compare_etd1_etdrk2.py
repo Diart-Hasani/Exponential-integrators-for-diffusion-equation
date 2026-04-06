@@ -123,6 +123,69 @@ def main() -> None:
     fig.savefig("results/compare_etd1_etdrk2/error_components_compare.png", dpi=300)
     plt.close(fig)
 
+def plot_error_scaling() -> None:
+    alpha = 1.0
+    ratio = 10.0
+    t0 = 0.0
+    T = 10.0
+    hs = np.array([0.1, 0.03, 0.01, 0.003, 0.001])
+
+    A = matrix_2x2(alpha=alpha, ratio=ratio)
+    # Choose nonlinearity = "sine" or "quadratic"
+    # Choos kind = "oscillatory", "mixed_decay", "stiffer_exact" or "pure_trig"
+    problem = make_semilinear_problem(A, beta=-1, kind="oscillatory")
+
+
+    errors_etd1 = np.array([])
+    errors_etdrk2 = np.array([])
+
+    for h in hs:
+        res_etd1 = etd1_solve(
+            u0=problem.u0,
+            t0=t0,
+            T=T,
+            h=h,
+            A=A,
+            b=problem.b,
+        )
+
+        res_etdrk2 = etdrk2_solve(
+            u0=problem.u0,
+            t0=t0,
+            T=T,
+            h=h,
+            A=A,
+            b=problem.b,
+        )
+
+        ts = res_etd1.t
+        u_ex = np.vstack([problem.u_exact(t) for t in ts])
+
+        u_etd1 = res_etd1.u
+        u_etdrk2 = res_etdrk2.u
+
+        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
+        errn_etdrk2 = np.linalg.norm(u_etdrk2 - u_ex, axis=1)
+
+        errors_etd1 = np.append(errors_etd1, np.max(errn_etd1))
+        errors_etdrk2 = np.append(errors_etdrk2, np.max(errn_etdrk2))
+
+    # error sclaing
+    plt.figure(figsize=(6, 4))
+    plt.loglog(hs, errors_etd1, "o--", label="ETD1")
+    plt.loglog(hs, errors_etdrk2, "s:", label="ETDRK2")
+    ref_oh = errors_etd1[0] * (hs / hs[0])
+    plt.loglog(hs, ref_oh, "k-.", label=r"$O(h)$")
+    ref_oh2 = errors_etdrk2[0] * (hs / hs[0])**2
+    plt.loglog(hs, ref_oh2, "b-.", label=r"$O(h^2)$")
+    plt.xlabel("h", fontsize=13)
+    plt.ylabel(r"$\max_t \|e(t)\|_2$", fontsize=13)
+    plt.title("Max error vs step size")
+    plt.grid(True, which="both")
+    plt.legend()
+    plt.savefig("results/compare_etd1_etdrk2/error_scaling.png", dpi=300)
+
 
 if __name__ == "__main__":
     main()
+    plot_error_scaling()

@@ -173,8 +173,6 @@ def plot_error_scaling() -> None:
     # plt.loglog(hs, errors_etd1, "o--", label="ETD1")
     plt.loglog(hs, errors_be, "s:", label="BE")
     ref_oh = errors_be[0] * (hs / hs[0])
-    print(errn_be)
-    print(ref_oh)
     plt.loglog(hs, ref_oh, "k-.", label=r"$O(h)$")
     plt.xlabel("h", fontsize=13)
     plt.ylabel(r"$\max_t \|e(t)\|_2$", fontsize=13)
