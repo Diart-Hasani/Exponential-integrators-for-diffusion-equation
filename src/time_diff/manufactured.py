@@ -23,8 +23,7 @@ def get_exact_solution(kind: str):
         def du_exact(t):
             return np.array(
                 [
-                    -np.exp(-t) * np.cos(2 * t)
-                    - 2 * np.exp(-t) * np.sin(2 * t),
+                    -np.exp(-t) * np.cos(2 * t) - 2 * np.exp(-t) * np.sin(2 * t),
                     -5 * np.exp(-5 * t) * np.cos(2 * t)
                     - 2 * np.exp(-5 * t) * np.sin(2 * t),
                 ]
@@ -35,14 +34,19 @@ def get_exact_solution(kind: str):
         b = 0.3
         c1 = 10
         c2 = 10
+
         def u_exact(t):
-            return np.array([np.exp(-b*t) * np.cos(c1 * t), np.exp(-b*t) * np.sin(c2 * t)])
+            return np.array(
+                [np.exp(-b * t) * np.cos(c1 * t), np.exp(-b * t) * np.sin(c2 * t)]
+            )
 
         def du_exact(t):
             return np.array(
                 [
-                    -b* np.exp(-b*t) * np.cos(c1 * t) - c1 * np.exp(-b*t) * np.sin(c1 * t),
-                    -b* np.exp(-b*t) * np.sin(c2 * t) + c2 * np.exp(-b*t) * np.cos(c2 * t),
+                    -b * np.exp(-b * t) * np.cos(c1 * t)
+                    - c1 * np.exp(-b * t) * np.sin(c1 * t),
+                    -b * np.exp(-b * t) * np.sin(c2 * t)
+                    + c2 * np.exp(-b * t) * np.cos(c2 * t),
                 ]
             )
 
@@ -52,20 +56,17 @@ def get_exact_solution(kind: str):
             return np.array([np.exp(-10 * t), np.exp(-t)])
 
         def du_exact(t):
-            return np.array(
-                [-10 * np.exp(-10 * t), -np.exp(-t)]
-            )
+            return np.array([-10 * np.exp(-10 * t), -np.exp(-t)])
 
     elif kind == "pure_trig":
         # Pure trigonometric
         c = 3
+
         def u_exact(t):
-            return np.array([np.sin(c*t), np.cos(c*t)])
+            return np.array([np.sin(c * t), np.cos(c * t)])
 
         def du_exact(t):
-            return np.array(
-                [c*np.cos(c*t) , - c*np.sin(c*t)]
-            )
+            return np.array([c * np.cos(c * t), -c * np.sin(c * t)])
 
     return u_exact, du_exact
 

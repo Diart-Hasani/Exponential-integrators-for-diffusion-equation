@@ -33,12 +33,12 @@ def etdrk2_step(
     phi1 = mats[1]
     phi2 = mats[2]
 
-    bn = b(t, u)
-    a = (E @ u) + (h * (phi1 @ bn))
-    bnp1 = b(t + h, a)
+    U1 = u
+    k1 = b(t, U1)
+    U2 = (E @ u) + (h * (phi1 @ k1))
+    k2 = b(t + h, U2)
 
-    corr = bnp1 - bn
-    return (E @ u) + h * ((phi1 @ bn) + (phi2 @ corr))
+    return (E @ u) + h * ((phi1 @ k1) + (phi2 @ (k2-k1)))
 
 
 def etdrk2_solve(

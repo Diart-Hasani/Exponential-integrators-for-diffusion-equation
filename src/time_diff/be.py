@@ -33,10 +33,8 @@ def be_step(
     tol: float = 1e-12,
 ) -> Array:
     """
-    One backward Euler step for u' = A u + b(t, u):
-        u_{n+1} = u_n + h (A u_{n+1} + b(t_{n+1}, u_{n+1}))
-    solved by fixed-point iteration:
-        (I - hA) u^{k+1} = u_n + h b(t_{n+1}, u^k).
+    One backward Euler step for with Newton iterations 
+    for nonlinear system.
     """
     u = _as_vec(u)
     A = np.asarray(A, dtype=float)
@@ -45,6 +43,7 @@ def be_step(
     t_next = t + h
     M = np.eye(d) - h * A
 
+    # Newton method
     u_guess = u.copy()
     for _ in range(fp_iters):
         rhs = u + h * b(t_next, u_guess)
@@ -71,6 +70,7 @@ def backward_euler_solve(
     A = np.asarray(A, dtype=float)
 
     if b is None:
+
         def b(t: float, u: Array) -> Array:
             return np.zeros_like(u, dtype=float)
 

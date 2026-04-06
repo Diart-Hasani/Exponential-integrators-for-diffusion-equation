@@ -41,7 +41,7 @@ def phi_scalar(z: float, k: int, small: float = 1e-8) -> float:
         return math.exp(z)
 
     # Start from phi_0 and use recurrence up to k
-    pk = math.exp(z)  # phi_0
+    pk = math.exp(z)
     for j in range(0, k):
         pk = (pk - 1.0 / math.factorial(j)) / z
     return pk

@@ -35,6 +35,7 @@ def main() -> None:
         A=A,
         fp_iters=50,
     )
+
     ts = res_etd1.t
     u_ex = np.vstack([problem.u_exact(t) for t in ts])
 
@@ -102,7 +103,7 @@ def main() -> None:
     axes[0].set_ylabel("absolute error")
     axes[0].set_title("Component 1 error")
     axes[0].set_yscale("log")
-    axes[0].set_ylim([10**(-18), 10**1])
+    axes[0].set_ylim([10 ** (-18), 10**1])
     axes[0].legend()
     axes[0].grid(True, which="both")
 
@@ -113,7 +114,7 @@ def main() -> None:
     axes[1].set_ylabel("absolute error")
     axes[1].set_title("Component 2 error")
     axes[1].set_yscale("log")
-    axes[1].set_ylim([10**(-18), 10**1])
+    axes[1].set_ylim([10 ** (-18), 10**1])
     axes[1].legend()
     axes[1].grid(True, which="both")
 
@@ -123,5 +124,66 @@ def main() -> None:
     plt.close(fig)
 
 
+def plot_error_scaling() -> None:
+    alpha = 1.0
+    ratio = 10.0
+    t0 = 0.0
+    T = 10.0
+    hs = np.array([0.1, 0.01, 0.001])
+
+    A = matrix_2x2(alpha=alpha, ratio=ratio)
+    problem = make_linear_problem(A)
+
+    errors_etd1 = np.array([])
+    errors_be = np.array([])
+
+    for h in hs:
+        res_etd1 = etd1_solve(
+            u0=problem.u0,
+            t0=t0,
+            T=T,
+            h=h,
+            A=A,
+            b=problem.b,
+        )
+
+        res_be = backward_euler_solve(
+            u0=problem.u0,
+            t0=t0,
+            T=T,
+            h=h,
+            A=A,
+            fp_iters=50,
+        )
+
+        ts = res_etd1.t
+        u_ex = np.vstack([problem.u_exact(t) for t in ts])
+
+        u_etd1 = res_etd1.u
+        u_be = res_be.u
+
+        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
+        errn_be = np.linalg.norm(u_be - u_ex, axis=1)
+
+        errors_etd1 = np.append(errors_etd1, np.max(errn_etd1))
+        errors_be = np.append(errors_be, np.max(errn_be))
+
+    # error sclaing
+    plt.figure(figsize=(6, 4))
+    # plt.loglog(hs, errors_etd1, "o--", label="ETD1")
+    plt.loglog(hs, errors_be, "s:", label="BE")
+    ref_oh = errors_be[0] * (hs / hs[0])
+    print(errn_be)
+    print(ref_oh)
+    plt.loglog(hs, ref_oh, "k-.", label=r"$O(h)$")
+    plt.xlabel("h", fontsize=13)
+    plt.ylabel(r"$\max_t \|e(t)\|_2$", fontsize=13)
+    plt.title("Max error vs step size")
+    plt.grid(True, which="both")
+    plt.legend()
+    plt.savefig("results/compare_etd_be/error_scaling_be.png", dpi=300)
+
+
 if __name__ == "__main__":
     main()
+    plot_error_scaling()
