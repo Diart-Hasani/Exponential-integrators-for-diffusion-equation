@@ -62,3 +62,8 @@ docs/code_help.txt
 # =====================
 *.egg-info/
 notebooks/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
