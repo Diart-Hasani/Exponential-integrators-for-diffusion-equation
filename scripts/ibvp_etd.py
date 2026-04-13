@@ -21,7 +21,7 @@ def fourier_exact(
     t: float,
     kappa: float = 1.0,
     L: float = 1.0,
-    m: int = 3,  # which sine mode is forced
+    m: int = 5,  # which sine mode is forced
     forcing: str = "cos",  # "cos" or "linear"
     n_modes: int = 400,
 ) -> np.ndarray:
@@ -115,7 +115,7 @@ def solve_fem_etd1(
         # f(t) * sin(m*pi*x/L) projected onto interior nodes
         # since we use nodal interpolation, this is just pointwise evaluation
         f_t = np.cos(t)  # or 3*t
-        m = 3
+        m = 5
         return f_t * np.sin(m * np.pi * x_int / L)
 
     sol = etd1_solve(
@@ -155,7 +155,7 @@ def solve_fem_etdrk2(
         # f(t) * sin(m*pi*x/L) projected onto interior nodes
         # since we use nodal interpolation, this is just pointwise evaluation
         f_t = np.cos(t)  # or 3*t
-        m = 3
+        m = 5
         return f_t * np.sin(m * np.pi * x_int / L)
 
     sol = etdrk2_solve(
@@ -314,7 +314,7 @@ def run_experiment():
 
     kappa = 1.5
     T = 0.2
-    dt = 0.01
+    dt = 0.1
 
     # method: "etd1" or "etdrk2"
     error_calc(method="etd1", kappa=kappa, T=T, output_dir=output_dir)
@@ -363,14 +363,14 @@ def run_experiment():
     )
 
     # Plot the function for different times
-    n_el_plot = 10
+    n_el_plot = 100
     dt_plot = 0.01
     times_to_plot = [0.0, 0.02, 0.04, 0.08]
 
     fig1, ax1 = plt.subplots(figsize=(8, 5))
 
     for t_plot in times_to_plot:
-        mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+        mesh, interior, x_full, x_int, sol = solve_fem_etd1(
             n_elements=n_el_plot,
             dt=dt_plot,
             T=t_plot,

@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
+from scipy.sparse.linalg import eigsh
 from fem.mesh_1d import Mesh1D
 
 
@@ -96,3 +97,12 @@ def apply_dirichlet_bc_matrix_rhs(
         rhs[node] = value
 
     return A.tocsr(), rhs
+
+def get_eig_range_ratio(M: np.ndarray, K:np.ndarray) -> np.ndarray :
+    lam_min = eigsh(K, M=M, k=1, which="SM", return_eigenvectors=False)[0]
+    lam_max = eigsh(K, M=M, k=1, which="LM", return_eigenvectors=False)[0]
+
+    eig_range =  np.array([-lam_max, -lam_min], dtype="float32")
+    eig_ratio = lam_max/lam_min
+
+    return eig_range, eig_ratio
