@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from src.time_diff.etd1 import etd1_solve
-from src.time_diff.be import backward_euler_solve
 from src.fem.mesh_1d import interval_mesh, boundary_nodes
 from src.fem.fem1d_assembly import assemble_matrices
+from src.time_diff.be import backward_euler_solve
 
 
 def u0_fun(x: np.ndarray) -> np.ndarray:
@@ -20,64 +20,54 @@ def fourier_exact(
     x: np.ndarray,
     t: float,
     kappa: float = 1.0,
-    L: float = 1.0,
-    m: int = 5,  # which sine mode is forced
-    forcing: str = "cos",  # "cos" or "linear"
     n_modes: int = 400,
 ) -> np.ndarray:
 
     x = np.asarray(x, dtype=float)
     u = np.zeros_like(x)
 
-    for k in range(1, n_modes + 1, 2):  # only odd k have nonzero c_k
-        mu_k = kappa * (k * np.pi / L) ** 2
-        c_k = 8.0 * L**2 / (k * np.pi) ** 3
-
-        # Homogeneous part: same for all modes
-        u_hat_k = c_k * np.exp(-mu_k * t)
-
-        # Particular part: only for the forced mode k == m
-        if k == m:
-            mu_m = mu_k
-            if forcing == "cos":
-                I_m = (mu_m * (np.cos(t) - np.exp(-mu_m * t)) + np.sin(t)) / (
-                    mu_m**2 + 1.0
-                )
-            elif forcing == "linear":
-                I_m = (3.0 / mu_m) * (t - (1.0 - np.exp(-mu_m * t)) / mu_m)
-            else:
-                raise ValueError(f"Unknown forcing '{forcing}'")
-
-            u_hat_k += I_m
-
-        u += u_hat_k * np.sin(k * np.pi * x / L)
+    for n in range(1, n_modes + 1, 2):
+        a_n = 8.0 / ((n * np.pi) ** 3)
+        u += a_n * np.exp(-kappa * (n * np.pi) ** 2 * t) * np.sin(n * np.pi * x)
 
     return u
 
 
-def truncation_error_relative(K_values, u0_coeffs, lambdas, d, t, L):
+def find_optimal_modes(
+    kappa: float = 1.0,
+    L: float = 1.0,
+    tol: float = 1e-10,
+    max_modes: int = 10_000,
+) -> int:
     """
-    Estimate relative truncation error for increasing K.
-
-    u0_coeffs[k] = c_k  (Fourier coefficients, 1-indexed stored as 0-indexed)
-    lambdas[k]   = lambda_k = (k*pi/L)^2
+    Find the smallest odd K such that adding the next odd term changes
+    the L2 norm of the Fourier series by less than tol.
     """
-    # Full reference: use large K_ref
-    K_ref = K_values[-1] * 10
-    c = u0_coeffs[:K_ref]
-    lam = lambdas[:K_ref]
+    # Use t=0 as the default: no exponential decay, so convergence is slowest
+    t = 0.0
 
-    # L2 norm squared uses orthogonality: ||phi_k||^2 = L/2
-    weights = (L / 2) * np.exp(-2 * d * lam * t)
-    full_norm_sq = np.sum(c**2 * weights)
+    phi_norm = np.sqrt(L / 2.0)
 
-    errors = []
-    for K in K_values:
-        tail_norm_sq = np.sum(c[K:] ** 2 * weights[K:])
-        rel_err = np.sqrt(tail_norm_sq / full_norm_sq)
-        errors.append(rel_err)
+    K = 1
+    while K + 2 <= max_modes:
+        k_next = K + 2
+        lam = (k_next * np.pi / L) ** 2
+        c_k = 8.0 * L**2 / (k_next * np.pi) ** 3
+        decay = np.exp(-kappa * lam * t)
 
-    return np.array(errors)
+        increment = abs(c_k) * decay * phi_norm
+
+        if increment < tol:
+            print(
+                f"K = {K:>6} odd modes  "
+                f"(last increment = {increment:.2e} < tol = {tol:.2e})"
+            )
+            return K
+
+        K = k_next
+
+    print(f"Warning: max_modes={max_modes} reached without convergence.")
+    return K
 
 
 def build_reduced_system_1d(n_elements: int, lx: float = 1.0):
@@ -117,6 +107,7 @@ def l2_error_on_nodes(x: np.ndarray, e: np.ndarray) -> float:
 
 def solve_fem_etd1(
     n_elements: int,
+    lx: float,
     dt: float,
     T: float,
     kappa: float = 1.0,
@@ -130,18 +121,14 @@ def solve_fem_etd1(
     """
     mesh, interior, bd, Mii, Kii, x_full, x_int = build_reduced_system_1d(
         n_elements=n_elements,
-        lx=1.0,
+        lx=lx,
     )
 
     A = -np.linalg.solve(Mii, kappa * Kii)
     u0 = fem_initial_vector(x_int)
 
     def b(t: float, u: np.ndarray, L: float = 1.0) -> np.ndarray:
-        # f(t) * sin(m*pi*x/L) projected onto interior nodes
-        # since we use nodal interpolation, this is just pointwise evaluation
-        f_t = np.cos(t)  # or 3*t
-        m = 5
-        return f_t * np.sin(m * np.pi * x_int / L)
+        return np.zeros_like(u)
 
     sol = etd1_solve(
         u0=u0,
@@ -157,6 +144,7 @@ def solve_fem_etd1(
 
 def solve_fem_be(
     n_elements: int,
+    lx: float,
     dt: float,
     T: float,
     kappa: float = 1.0,
@@ -170,18 +158,14 @@ def solve_fem_be(
     """
     mesh, interior, bd, Mii, Kii, x_full, x_int = build_reduced_system_1d(
         n_elements=n_elements,
-        lx=1.0,
+        lx=lx,
     )
 
     A = -np.linalg.solve(Mii, kappa * Kii)
     u0 = fem_initial_vector(x_int)
 
     def b(t: float, u: np.ndarray, L: float = 1.0) -> np.ndarray:
-        # f(t) * sin(m*pi*x/L) projected onto interior nodes
-        # since we use nodal interpolation, this is just pointwise evaluation
-        f_t = np.cos(t)  # or 3*t
-        m = 5
-        return f_t * np.sin(m * np.pi * x_int / L)
+        return np.zeros_like(u)
 
     sol = backward_euler_solve(
         u0=u0,
@@ -199,6 +183,7 @@ def animate_solution_1d(
     x: np.ndarray,
     u_snapshots: np.ndarray,
     times: np.ndarray,
+    method: str,
     save_path: str,
     u_exact_snapshots: np.ndarray | None = None,
 ) -> None:
@@ -219,7 +204,7 @@ def animate_solution_1d(
     ax.set_ylabel("u(x,t)")
     ax.grid(True, alpha=0.3)
 
-    (line_num,) = ax.plot([], [], "--", linewidth=2, label="FEM + etd1")
+    (line_num,) = ax.plot([], [], "--", linewidth=2, label=f"FEM + {method}")
     if u_exact_snapshots is not None:
         (line_ex,) = ax.plot([], [], "-", linewidth=2, label="Fourier")
     else:
@@ -249,79 +234,58 @@ def animate_solution_1d(
     plt.close(fig)
 
 
-# Calculate error for each size of elements and delta t
+# Calculate error for each delta t
 def error_calc(
-    method: str = "", kappa: float = 1.0, T: float = 1.0, output_dir: str = None
+    method: str = "etd1",
+    kappa: float = 1.0,
+    T: float = 1.0,
+    lx: float = 1.0,
+    n_elements: int = 160,
+    n_modes: int = 500,
+    output_dir: str = None,
 ) -> None:
-    n_elements_list = [20, 40, 80, 160]
-    dt_list = [0.1, 0.05, 0.025, 0.0125]
 
-    err_inf = np.zeros((len(n_elements_list), len(dt_list)))
-    err_l2 = np.zeros((len(n_elements_list), len(dt_list)))
+    dt_list = np.array([0.1, 0.05, 0.025, 0.0125])
 
-    for i, n_el in enumerate(n_elements_list):
-        for j, dt in enumerate(dt_list):
-            if method == "etd1":
-                mesh, interior, x_full, x_int, sol = solve_fem_etd1(
-                    n_elements=n_el,
-                    dt=dt,
-                    T=T,
-                    kappa=kappa,
-                )
-            elif method == "be":
-                mesh, interior, x_full, x_int, sol = solve_fem_be(
-                    n_elements=n_el,
-                    dt=dt,
-                    T=T,
-                    kappa=kappa,
-                )
+    err_inf = np.zeros(len(dt_list))
+    err_l2 = np.zeros(len(dt_list))
 
-            u_num = add_boundaries(sol.u[-1])
-            u_ex = fourier_exact(x_full, T, kappa=kappa, n_modes=800)
-            e = u_num - u_ex
+    for j, dt in enumerate(dt_list):
+        if method == "etd1":
+            mesh, interior, x_full, x_int, sol = solve_fem_etd1(
+                n_elements=n_elements,
+                lx=lx,
+                dt=dt,
+                T=T,
+                kappa=kappa,
+            )
+        elif method == "be":
+            mesh, interior, x_full, x_int, sol = solve_fem_be(
+                n_elements=n_elements,
+                lx=lx,
+                dt=dt,
+                T=T,
+                kappa=kappa,
+            )
 
-            err_inf[i, j] = np.max(np.abs(e))
-            err_l2[i, j] = l2_error_on_nodes(x_full, e)
+        u_num = add_boundaries(sol.u[-1])
+        u_ex = fourier_exact(x_full, T, kappa=kappa, n_modes=n_modes)
+        e = u_num - u_ex
 
-    # Plot error sclaing with mesh scaling
-    fixed_dt_index = -1
-    fixed_dt = dt_list[fixed_dt_index]
-    h_list = np.array([1.0 / n for n in n_elements_list])
-
-    fig2, ax2 = plt.subplots(figsize=(7, 5))
-    ax2.loglog(
-        h_list, err_inf[:, fixed_dt_index], "o-", label=f"max error, dt={fixed_dt}"
-    )
-    ax2.loglog(
-        h_list, err_l2[:, fixed_dt_index], "s-", label=f"L2 error, dt={fixed_dt}"
-    )
-
-    ref = err_l2[-1, fixed_dt_index] * (h_list / h_list[-1]) ** 2
-    ax2.loglog(h_list, ref, "k--", label="reference slope 2")
-
-    ax2.set_xlabel("mesh size h")
-    ax2.set_ylabel("error at final time")
-    ax2.set_title(f"Error of {method} vs mesh size")
-    ax2.grid(True, which="both", alpha=0.3)
-    ax2.legend()
-    fig2.tight_layout()
-    fig2.savefig(os.path.join(output_dir, f"mesh_error_{method}.png"), dpi=300)
-    plt.close(fig2)
+        err_inf[j] = np.max(np.abs(e))
+        err_l2[j] = l2_error_on_nodes(x_full, e)
 
     # Plot error scaling with delta time scaling
-    fixed_mesh_index = 0
-    fixed_n_el = n_elements_list[fixed_mesh_index]
-
     fig3, ax3 = plt.subplots(figsize=(7, 5))
     ax3.loglog(
         dt_list,
-        err_inf[fixed_mesh_index, :],
+        err_inf,
         "o-",
-        label=f"max error, n_el={fixed_n_el}",
+        label="max error",
     )
-    ax3.loglog(
-        dt_list, err_l2[fixed_mesh_index, :], "s-", label=f"L2 error, n_el={fixed_n_el}"
-    )
+    ax3.loglog(dt_list, err_l2, "s-", label="L2 error")
+    ref = err_l2[0] * (dt_list / dt_list[0])
+    ax3.loglog(dt_list, ref, "k--", label="reference slope 2")
 
     ax3.set_xlabel("time step dt")
     ax3.set_ylabel("error at final time")
@@ -333,97 +297,97 @@ def error_calc(
     plt.close(fig3)
 
 
-def run_experiment():
+def main():
     output_dir = "results/ibvp_etd"
     os.makedirs(output_dir, exist_ok=True)
 
-    kappa = 1.5
+    kappa = 2.0
     T = 0.2
     dt = 0.001
+    lx = 1.0
+    n_elements = 160
 
-    # find amount of fourier nodes
-    L, d, t = 1.0, 1.0, 0.0
-    K_max = 500
-    ks = np.arange(1, K_max + 1)
-    lambdas = (ks * np.pi / L) ** 2
+    n_optimal = find_optimal_modes(kappa=kappa, L=1, tol=1e-8)
 
-    # Closed-form coefficients: c_k = 8L^2/(k*pi)^3 for odd k, 0 for even k
-    c = np.where(ks % 2 == 1, 8 * L**2 / (ks * np.pi) ** 3, 0.0)
-
-    n_values = [10, 20, 50, 100, 200]
-    errors = truncation_error_relative(n_values, c, lambdas, d, t, L)
-
-    n_optimal = 10
-    min_error = np.inf
-    for K, err in zip(n_values, errors):
-        if err < min_error:
-            min_error=err
-            n_optimal = K
-    
-
-    # method: "etd1" or "etdrk2"
-    error_calc(method="etd1", kappa=kappa, T=T, output_dir=output_dir, n_nodes =n_optimal)
-    error_calc(method="be", kappa=kappa, T=T, output_dir=output_dir, n_nodes = n_optimal)
-
-    # Make an animation for etd1
-    mesh, interior, x_full, x_int, sol = solve_fem_etd1(
-        n_elements=50,
-        dt=dt,
-        T=T,
-        kappa=kappa,
+    error_calc(
+        method="etd1", kappa=kappa, T=T, output_dir=output_dir, n_modes=n_optimal
     )
+    error_calc(method="be", kappa=kappa, T=T, output_dir=output_dir, n_modes=n_optimal)
 
-    u_num_snapshots = np.array([add_boundaries(u_int) for u_int in sol.u])
-    u_exact_snapshots = np.array(
-        [fourier_exact(x_full, t, kappa=kappa, n_modes=1000) for t in sol.t]
-    )
+    make_animation = True
+    if make_animation:
+        kappa = 2.0
+        T = 0.2
+        dt = 0.01
+        lx = 1.0
+        n_elements = 160
 
-    animate_solution_1d(
-        x=x_full,
-        u_snapshots=u_num_snapshots,
-        times=sol.t,
-        save_path=os.path.join(output_dir, "solution_animation_etd1.gif"),
-        u_exact_snapshots=u_exact_snapshots,
-    )
+        # Make an animation for etd1
+        mesh, interior, x_full, x_int, sol = solve_fem_etd1(
+            n_elements=n_elements,
+            lx=lx,
+            dt=dt,
+            T=T,
+            kappa=kappa,
+        )
 
-    # Make an animation for etdrk2
-    mesh, interior, x_full, x_int, sol = solve_fem_be(
-        n_elements=50,
-        dt=dt,
-        T=T,
-        kappa=kappa,
-    )
+        u_num_snapshots = np.array([add_boundaries(u_int) for u_int in sol.u])
+        u_exact_snapshots = np.array(
+            [fourier_exact(x_full, t, kappa=kappa, n_modes=n_optimal) for t in sol.t]
+        )
 
-    u_num_snapshots = np.array([add_boundaries(u_int) for u_int in sol.u])
-    u_exact_snapshots = np.array(
-        [fourier_exact(x_full, t, kappa=kappa, n_modes=1000) for t in sol.t]
-    )
+        animate_solution_1d(
+            x=x_full,
+            u_snapshots=u_num_snapshots,
+            times=sol.t,
+            method="etd1",
+            save_path=os.path.join(output_dir, "solution_animation_etd1.gif"),
+            u_exact_snapshots=u_exact_snapshots,
+        )
 
-    animate_solution_1d(
-        x=x_full,
-        u_snapshots=u_num_snapshots,
-        times=sol.t,
-        save_path=os.path.join(output_dir, "solution_animation_be.gif"),
-        u_exact_snapshots=u_exact_snapshots,
-    )
+        # Make an animation for be
+        mesh, interior, x_full, x_int, sol = solve_fem_be(
+            n_elements=n_elements,
+            lx=lx,
+            dt=dt,
+            T=T,
+            kappa=kappa,
+        )
+
+        u_num_snapshots = np.array([add_boundaries(u_int) for u_int in sol.u])
+        u_exact_snapshots = np.array(
+            [fourier_exact(x_full, t, kappa=kappa, n_modes=n_optimal) for t in sol.t]
+        )
+
+        animate_solution_1d(
+            x=x_full,
+            u_snapshots=u_num_snapshots,
+            times=sol.t,
+            method="be",
+            save_path=os.path.join(output_dir, "solution_animation_be.gif"),
+            u_exact_snapshots=u_exact_snapshots,
+        )
 
     # Plot the function for different times
-    n_el_plot = 20
+    n_el_plot = 160
+    lx = 1.0
+    kappa = 2.0
     dt_plot = 0.01
-    times_to_plot = [0.0, 0.02, 0.04, 0.08]
+    times_to_plot = [0.0, 0.02, 0.04, 0.08, 0.16]
 
     fig1, ax1 = plt.subplots(figsize=(8, 5))
 
     for t_plot in times_to_plot:
         mesh, interior, x_full, x_int, sol = solve_fem_be(
             n_elements=n_el_plot,
+            lx=lx,
             dt=dt_plot,
             T=t_plot,
             kappa=kappa,
         )
 
         u_num = add_boundaries(sol.u[-1])
-        u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=800)
+        u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=n_optimal)
 
         ax1.plot(x_full, u_ex, "-", linewidth=2, label=f"Fourier, t={t_plot:g}")
         ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+be, t={t_plot:g}")
@@ -439,4 +403,4 @@ def run_experiment():
 
 
 if __name__ == "__main__":
-    run_experiment()
+    main()

@@ -88,7 +88,6 @@ def backward_euler_solve(
     A = np.asarray(A, dtype=float)
 
     if b is None:
-
         def b(t: float, u: Array) -> Array:
             return np.zeros_like(u, dtype=float)
 
@@ -101,7 +100,7 @@ def backward_euler_solve(
     while t < T - 1e-15:
         h_step = min(h, T - t)
 
-        if np.any(b):
+        if not np.any(b):
             u = be_step(u, h, A)
         else:
             u = be_step_newton(u, t, h_step, A, b, fp_iters=fp_iters, tol=tol)
