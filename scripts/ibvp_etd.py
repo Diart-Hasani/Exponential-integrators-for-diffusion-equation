@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 from src.time_diff.etd1 import etd1_solve
-from src.time_diff.etdrk2 import etdrk2_solve
+from src.time_diff.be import backward_euler_solve
 from src.fem.mesh_1d import interval_mesh, boundary_nodes
 from src.fem.fem1d_assembly import assemble_matrices
 
@@ -55,6 +55,31 @@ def fourier_exact(
     return u
 
 
+def truncation_error_relative(K_values, u0_coeffs, lambdas, d, t, L):
+    """
+    Estimate relative truncation error for increasing K.
+
+    u0_coeffs[k] = c_k  (Fourier coefficients, 1-indexed stored as 0-indexed)
+    lambdas[k]   = lambda_k = (k*pi/L)^2
+    """
+    # Full reference: use large K_ref
+    K_ref = K_values[-1] * 10
+    c = u0_coeffs[:K_ref]
+    lam = lambdas[:K_ref]
+
+    # L2 norm squared uses orthogonality: ||phi_k||^2 = L/2
+    weights = (L / 2) * np.exp(-2 * d * lam * t)
+    full_norm_sq = np.sum(c**2 * weights)
+
+    errors = []
+    for K in K_values:
+        tail_norm_sq = np.sum(c[K:] ** 2 * weights[K:])
+        rel_err = np.sqrt(tail_norm_sq / full_norm_sq)
+        errors.append(rel_err)
+
+    return np.array(errors)
+
+
 def build_reduced_system_1d(n_elements: int, lx: float = 1.0):
     """
     Build a 1D mesh, assemble full FEM matrices, and restrict to interior nodes.
@@ -99,7 +124,7 @@ def solve_fem_etd1(
     """
     Solve
 
-        M U'(t) + kappa K U(t) = 
+        M U'(t) + kappa K U(t) =
 
     on the interior nodes using etd1.
     """
@@ -130,7 +155,7 @@ def solve_fem_etd1(
     return mesh, interior, x_full, x_int, sol
 
 
-def solve_fem_etdrk2(
+def solve_fem_be(
     n_elements: int,
     dt: float,
     T: float,
@@ -158,7 +183,7 @@ def solve_fem_etdrk2(
         m = 5
         return f_t * np.sin(m * np.pi * x_int / L)
 
-    sol = etdrk2_solve(
+    sol = backward_euler_solve(
         u0=u0,
         t0=0.0,
         T=T,
@@ -243,8 +268,8 @@ def error_calc(
                     T=T,
                     kappa=kappa,
                 )
-            elif method == "etdrk2":
-                mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+            elif method == "be":
+                mesh, interior, x_full, x_int, sol = solve_fem_be(
                     n_elements=n_el,
                     dt=dt,
                     T=T,
@@ -309,16 +334,36 @@ def error_calc(
 
 
 def run_experiment():
-    output_dir = "results/ibvp_fourier_etd"
+    output_dir = "results/ibvp_etd"
     os.makedirs(output_dir, exist_ok=True)
 
     kappa = 1.5
     T = 0.2
-    dt = 0.1
+    dt = 0.001
+
+    # find amount of fourier nodes
+    L, d, t = 1.0, 1.0, 0.0
+    K_max = 500
+    ks = np.arange(1, K_max + 1)
+    lambdas = (ks * np.pi / L) ** 2
+
+    # Closed-form coefficients: c_k = 8L^2/(k*pi)^3 for odd k, 0 for even k
+    c = np.where(ks % 2 == 1, 8 * L**2 / (ks * np.pi) ** 3, 0.0)
+
+    n_values = [10, 20, 50, 100, 200]
+    errors = truncation_error_relative(n_values, c, lambdas, d, t, L)
+
+    n_optimal = 10
+    min_error = np.inf
+    for K, err in zip(n_values, errors):
+        if err < min_error:
+            min_error=err
+            n_optimal = K
+    
 
     # method: "etd1" or "etdrk2"
-    error_calc(method="etd1", kappa=kappa, T=T, output_dir=output_dir)
-    error_calc(method="etdrk2", kappa=kappa, T=T, output_dir=output_dir)
+    error_calc(method="etd1", kappa=kappa, T=T, output_dir=output_dir, n_nodes =n_optimal)
+    error_calc(method="be", kappa=kappa, T=T, output_dir=output_dir, n_nodes = n_optimal)
 
     # Make an animation for etd1
     mesh, interior, x_full, x_int, sol = solve_fem_etd1(
@@ -342,7 +387,7 @@ def run_experiment():
     )
 
     # Make an animation for etdrk2
-    mesh, interior, x_full, x_int, sol = solve_fem_etdrk2(
+    mesh, interior, x_full, x_int, sol = solve_fem_be(
         n_elements=50,
         dt=dt,
         T=T,
@@ -358,19 +403,19 @@ def run_experiment():
         x=x_full,
         u_snapshots=u_num_snapshots,
         times=sol.t,
-        save_path=os.path.join(output_dir, "solution_animation_etdrk2.gif"),
+        save_path=os.path.join(output_dir, "solution_animation_be.gif"),
         u_exact_snapshots=u_exact_snapshots,
     )
 
     # Plot the function for different times
-    n_el_plot = 100
+    n_el_plot = 20
     dt_plot = 0.01
     times_to_plot = [0.0, 0.02, 0.04, 0.08]
 
     fig1, ax1 = plt.subplots(figsize=(8, 5))
 
     for t_plot in times_to_plot:
-        mesh, interior, x_full, x_int, sol = solve_fem_etd1(
+        mesh, interior, x_full, x_int, sol = solve_fem_be(
             n_elements=n_el_plot,
             dt=dt_plot,
             T=t_plot,
@@ -381,11 +426,11 @@ def run_experiment():
         u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=800)
 
         ax1.plot(x_full, u_ex, "-", linewidth=2, label=f"Fourier, t={t_plot:g}")
-        ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+etd1, t={t_plot:g}")
+        ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+be, t={t_plot:g}")
 
     ax1.set_xlabel("x")
     ax1.set_ylabel("u(x,t)")
-    ax1.set_title("1D heat equation: Fourier vs FEM+etd1")
+    ax1.set_title("1D heat equation: Fourier vs FEM+be")
     ax1.grid(True, alpha=0.3)
     ax1.legend(fontsize=8, ncol=2)
     fig1.tight_layout()

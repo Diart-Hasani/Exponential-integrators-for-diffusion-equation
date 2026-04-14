@@ -8,12 +8,13 @@ from src.time_diff.be import backward_euler_solve
 
 
 def main() -> None:
-    alpha = 100.0
+    alpha = 10
+    ratio = 10
     t0 = 0.0
-    T = 10.0
-    h = 0.1
+    T = 0.3
+    h = 0.01
 
-    A = matrix_2x2(alpha=alpha)
+    A = matrix_2x2(alpha=alpha, ratio=ratio)
     problem = make_linear_problem(A)
 
     res = backward_euler_solve(
@@ -36,30 +37,38 @@ def main() -> None:
     print(f"Max abs error componentwise: {max_err}")
     print(f"Max abs error (overall): {np.max(err)}")
 
-    plt.figure()
-    plt.plot(ts, u_ex[:, 0], label="exact u1")
-    plt.plot(ts, u_num[:, 0], "--", label="BE u1")
-    plt.xlabel("t")
-    plt.ylabel("u1(t)")
-    plt.title("Component u1: Backward Euler vs exact")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("results/be/u1.png", dpi=300)
+    # u1 and u2
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    plt.figure()
-    plt.plot(ts, u_ex[:, 1], label="exact u2")
-    plt.plot(ts, u_num[:, 1], "--", label="BE u2")
-    plt.xlabel("t")
-    plt.ylabel("u2(t)")
-    plt.title("Component u2: Backward Euler vs exact")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("results/be/u2.png", dpi=300)
+    # left plot: u1
+    axes[0].plot(ts, u_ex[:, 0], "k", label="exact u1")
+    axes[0].plot(ts, u_num[:, 0], "--", label="BE u1")
+    axes[0].set_xlim([0, T])
+    axes[0].set_xlabel("t")
+    axes[0].set_ylabel("u1(t)")
+    axes[0].set_title("Component u1: BE vs exact")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    # right plot: u2
+    axes[1].plot(ts, u_ex[:, 1], "k", label="exact u2")
+    axes[1].plot(ts, u_num[:, 1], "--", label="BE u2")
+    axes[1].set_xlim([0, 0.15])
+    axes[1].set_xlabel("t")
+    axes[1].set_ylabel("u2(t)")
+    axes[1].set_title("Component u2: BE vs exact")
+    axes[1].legend()
+    axes[1].grid(True)
+
+    fig.tight_layout()
+    fig.savefig("results/be/u1_u2_compare.png", dpi=300)
+    plt.close(fig)
 
     plt.figure()
     plt.plot(ts, err[:, 0], label="|error u1|")
     plt.plot(ts, err[:, 1], label="|error u2|")
     plt.plot(ts, err_norm, "k:", label="||error||_2")
+    plt.ylim([1e-4,1])
     plt.xlabel("t")
     plt.ylabel("error")
     plt.title("Backward Euler error vs time")

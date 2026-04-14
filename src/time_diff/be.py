@@ -25,6 +25,24 @@ def _as_vec(u: Array) -> Array:
 
 def be_step(
     u: Array,
+    h: float,
+    A: Array,
+) -> Array:
+    """
+    One backward Euler step for linear system.
+    """
+    u = _as_vec(u)
+    A = np.asarray(A, dtype=float)
+
+    d = u.size
+    M = np.eye(d) - h * A
+    sol = np.linalg.solve(M, u)
+
+    return sol
+
+
+def be_step_newton(
+    u: Array,
     t: float,
     h: float,
     A: Array,
@@ -33,7 +51,7 @@ def be_step(
     tol: float = 1e-12,
 ) -> Array:
     """
-    One backward Euler step for with Newton iterations 
+    One backward Euler step for with Newton iterations
     for nonlinear system.
     """
     u = _as_vec(u)
@@ -82,7 +100,11 @@ def backward_euler_solve(
 
     while t < T - 1e-15:
         h_step = min(h, T - t)
-        u = be_step(u, t, h_step, A, b, fp_iters=fp_iters, tol=tol)
+
+        if np.any(b):
+            u = be_step(u, h, A)
+        else:
+            u = be_step_newton(u, t, h_step, A, b, fp_iters=fp_iters, tol=tol)
         t = t + h_step
 
         times.append(float(t))
