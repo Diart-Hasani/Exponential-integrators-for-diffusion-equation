@@ -270,12 +270,12 @@ def error_calc(
     kappa: float = 1.0,
     T: float = 1.0,
     lx: float = 1.0,
-    n_elements: int = 160,
+    n_elements: int = 200 + 1,
     n_modes: int = 500,
     output_dir: str = None,
 ) -> None:
 
-    dt_list = np.array([0.1, 0.05, 0.025, 0.0125])
+    dt_list = np.array([0.1, 0.05, 0.025, 0.01, 0.005, 0.0025])
 
     err_inf = np.zeros(len(dt_list))
     err_l2 = np.zeros(len(dt_list))
@@ -298,12 +298,26 @@ def error_calc(
                 kappa=kappa,
             )
 
-        u_num = add_boundaries(sol.u[-1])
-        u_ex = fourier_exact(x_full, T, kappa=kappa, n_modes=n_modes)
-        e = u_num - u_ex
+        max_err_inf = 0.0
+        max_err_l2 = 0.0
 
-        err_inf[j] = np.max(np.abs(e))
-        err_l2[j] = l2_error_on_nodes(x_full, e)
+        for t, u_int in zip(sol.t, sol.u):
+            u_num = add_boundaries(u_int)
+            u_ex = fourier_exact(x_full, t, kappa=kappa, n_modes=n_modes)
+            e = u_num - u_ex
+
+            ex_inf = np.max(np.abs(u_ex))
+            ex_l2 = l2_error_on_nodes(x_full, u_ex)
+
+            eps = 1e-14
+            rel_err_inf = np.max(np.abs(e)) / max(ex_inf, eps)
+            rel_err_l2 = l2_error_on_nodes(x_full, e) / max(ex_l2, eps)
+
+            max_err_inf = max(max_err_inf, rel_err_inf)
+            max_err_l2 = max(max_err_l2, rel_err_l2)
+
+        err_inf[j] = max_err_inf
+        err_l2[j] = max_err_l2
 
     # Plot error scaling with delta time scaling
     fig3, ax3 = plt.subplots(figsize=(7, 5))
@@ -318,8 +332,8 @@ def error_calc(
     ax3.loglog(dt_list, ref, "k--", label="reference slope 2")
 
     ax3.set_xlabel("time step dt")
-    ax3.set_ylabel("error at final time")
-    ax3.set_title(f"Error of {method} vs time step")
+    ax3.set_ylabel("Relative error on [0, T]")
+    ax3.set_title(f"Max relative error of {method} vs time step")
     ax3.grid(True, which="both", alpha=0.3)
     ax3.legend()
     fig3.tight_layout()
@@ -335,16 +349,29 @@ def main():
     T = 0.2
     dt = 0.001
     lx = 1.0
-    n_elements = 160
+    n_elements = 1000 + 1
 
     n_optimal = find_optimal_modes(kappa=kappa, L=1, tol=1e-8)
 
     error_calc(
-        method="etd1", kappa=kappa, T=T, output_dir=output_dir, n_modes=n_optimal
+        n_elements=n_elements,
+        method="be",
+        kappa=kappa,
+        T=T,
+        output_dir=output_dir,
+        n_modes=n_optimal,
     )
-    error_calc(method="be", kappa=kappa, T=T, output_dir=output_dir, n_modes=n_optimal)
 
-    make_animation = True
+    error_calc(
+        n_elements=n_elements,
+        method="etd1",
+        kappa=kappa,
+        T=T,
+        output_dir=output_dir,
+        n_modes=n_optimal,
+    )
+
+    make_animation = False
     if make_animation:
         kappa = 2.0
         T = 0.2
@@ -398,38 +425,40 @@ def main():
             u_exact_snapshots=u_exact_snapshots,
         )
 
-    # Plot the function for different times
-    n_el_plot = 160
-    lx = 1.0
-    kappa = 2.0
-    dt_plot = 0.01
-    times_to_plot = [0.0, 0.02, 0.04, 0.08, 0.16]
+    make_time_plots = False
+    if make_time_plots:
+        # Plot the function for different times
+        n_el_plot = 160
+        lx = 1.0
+        kappa = 2.0
+        dt_plot = 0.01
+        times_to_plot = [0.0, 0.02, 0.04, 0.08, 0.16]
 
-    fig1, ax1 = plt.subplots(figsize=(8, 5))
+        fig1, ax1 = plt.subplots(figsize=(8, 5))
 
-    for t_plot in times_to_plot:
-        mesh, interior, x_full, x_int, sol = solve_fem_be(
-            n_elements=n_el_plot,
-            lx=lx,
-            dt=dt_plot,
-            T=t_plot,
-            kappa=kappa,
-        )
+        for t_plot in times_to_plot:
+            mesh, interior, x_full, x_int, sol = solve_fem_be(
+                n_elements=n_el_plot,
+                lx=lx,
+                dt=dt_plot,
+                T=t_plot,
+                kappa=kappa,
+            )
 
-        u_num = add_boundaries(sol.u[-1])
-        u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=n_optimal)
+            u_num = add_boundaries(sol.u[-1])
+            u_ex = fourier_exact(x_full, t_plot, kappa=kappa, n_modes=n_optimal)
 
-        ax1.plot(x_full, u_ex, "-", linewidth=2, label=f"Fourier, t={t_plot:g}")
-        ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+be, t={t_plot:g}")
+            ax1.plot(x_full, u_ex, "-", linewidth=2, label=f"Fourier, t={t_plot:g}")
+            ax1.plot(x_full, u_num, "--", linewidth=1.5, label=f"FEM+be, t={t_plot:g}")
 
-    ax1.set_xlabel("x")
-    ax1.set_ylabel("u(x,t)")
-    ax1.set_title("1D heat equation: Fourier vs FEM+be")
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(fontsize=8, ncol=2)
-    fig1.tight_layout()
-    fig1.savefig(os.path.join(output_dir, "solution_compare.png"), dpi=300)
-    plt.close(fig1)
+        ax1.set_xlabel("x")
+        ax1.set_ylabel("u(x,t)")
+        ax1.set_title("1D heat equation: Fourier vs FEM+be")
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=8, ncol=2)
+        fig1.tight_layout()
+        fig1.savefig(os.path.join(output_dir, "solution_compare.png"), dpi=300)
+        plt.close(fig1)
 
 
 if __name__ == "__main__":

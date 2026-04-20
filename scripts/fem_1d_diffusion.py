@@ -37,7 +37,7 @@ def build_load_vector(mesh, t: float) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    nx = 10
+    nx = 100 + 1
     lx = 1.0
     T = 0.2
     dt = 0.01
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     eig_range, eig_ratio = get_eig_range_ratio(Mii, Kii)
     print("eig range of -M^{-1}K:", eig_range)
-    print("Theoretical range of eig: ", -12 / (lx / nx) ** 2, (np.pi / lx) ** 2)
+    print("Theoretical range of eig: ", -12 / (lx / nx) ** 2, -((np.pi / lx) ** 2))
     print("Stiffness ratio: ", eig_ratio)
     print("Theoretical stiffness ration: ", (12 * nx**2) / np.pi**2)
 

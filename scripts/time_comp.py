@@ -185,6 +185,7 @@ def solve_fem_etd1_krylov(
     dt: float,
     T: float,
     kappa: float = 1.0,
+    m: int = 30,
 ):
     """
     Solve
@@ -211,7 +212,7 @@ def solve_fem_etd1_krylov(
         h=dt,
         A=A,
         b=b,
-        m=10,
+        m=m,
     )
 
     return mesh, interior, x_full, x_int, sol
@@ -231,7 +232,6 @@ def error_calc(
 
     err_inf = 0
     err_l2 = 0
-
     start = time.perf_counter()
     if method == "etd1":
         mesh, interior, x_full, x_int, sol = solve_fem_etd1(
@@ -256,15 +256,23 @@ def error_calc(
             dt=dt,
             T=T,
             kappa=kappa,
+            m=30,
         )
     elapsed = time.perf_counter() - start
 
-    u_num = add_boundaries(sol.u[-1])
-    u_ex = fourier_exact(x_full, T, kappa=kappa, n_modes=n_modes)
-    e = u_num - u_ex
+    max_err_inf = 0.0
+    max_err_l2 = 0.0
 
-    err_inf = np.max(np.abs(e))
-    err_l2 = l2_error_on_nodes(x_full, e)
+    for t, u_int in zip(sol.t, sol.u):
+        u_num = add_boundaries(u_int)
+        u_ex = fourier_exact(x_full, t, kappa=kappa, n_modes=n_modes)
+        e = u_num - u_ex
+
+        max_err_inf = max(max_err_inf, np.max(np.abs(e)))
+        max_err_l2 = max(max_err_l2, l2_error_on_nodes(x_full, e))
+
+    err_inf = max_err_inf
+    err_l2 = max_err_l2
 
     print(f"Max error using {method}: ", err_inf)
     print(f"L2 error using {method}: ", err_l2)
@@ -277,11 +285,11 @@ def main():
 
     kappa = 2.0
     T = 0.2
-    dt = 0.001
+    dt = 0.01
     lx = 1.0
-    n_elements = 1000
+    n_elements = 1000 + 1
 
-    n_optimal = find_optimal_modes(kappa=kappa, L=1, tol=1e-9)
+    n_optimal = find_optimal_modes(kappa=kappa, L=1, tol=1e-8)
 
     error_calc(
         n_elements=n_elements,
@@ -296,7 +304,7 @@ def main():
 
     error_calc(
         n_elements=n_elements,
-        method="etd1_krylov",
+        method="be",
         kappa=kappa,
         T=T,
         dt=dt,
@@ -304,7 +312,7 @@ def main():
         output_dir=output_dir,
         n_modes=n_optimal,
     )
-    """
+
     error_calc(
         n_elements=n_elements,
         method="etd1_krylov",
@@ -315,7 +323,7 @@ def main():
         output_dir=output_dir,
         n_modes=n_optimal,
     )
-    """
+
 
 if __name__ == "__main__":
     main()

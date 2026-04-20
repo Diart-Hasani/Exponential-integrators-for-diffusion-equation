@@ -42,15 +42,19 @@ def main() -> None:
     u_etd1 = res_etd1.u
     u_be = res_be.u
 
-    err_etd1 = np.abs(u_etd1 - u_ex)
-    err_be = np.abs(u_be - u_ex)
+    eps = 1e-14
 
-    errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
-    errn_be = np.linalg.norm(u_be - u_ex, axis=1)
+    # relative errors
+    err_etd1 = np.abs(u_etd1 - u_ex) / np.maximum(np.abs(u_ex), eps)
+    err_be = np.abs(u_be - u_ex) / np.maximum(np.abs(u_ex), eps)
+
+    u_ex_norm = np.maximum(np.linalg.norm(u_ex, axis=1), eps)
+    errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1) / u_ex_norm
+    errn_be = np.linalg.norm(u_be - u_ex, axis=1) / u_ex_norm
 
     print(f"Compare ETD1 vs BE: alpha={alpha}, h={h}, steps={res_etd1.n_steps}")
-    print(f"ETD1 max abs error overall: {np.max(err_etd1)}")
-    print(f"BE   max abs error overall: {np.max(err_be)}")
+    print(f"ETD1 relative max error overall: {np.max(err_etd1)}")
+    print(f"BE relative max error overall: {np.max(err_be)}")
 
     # u1 and u2 plots
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
@@ -83,11 +87,11 @@ def main() -> None:
 
     # error norms
     plt.figure()
-    plt.plot(ts, errn_etd1, "--", label="||error||_2 ETD1")
-    plt.plot(ts, errn_be, ":", label="||error||_2 BE")
+    plt.plot(ts, errn_etd1, "--", label="relative ||error||_2 ETD1")
+    plt.plot(ts, errn_be, ":", label="relative ||error||_2 BE")
     plt.xlabel("t")
-    plt.ylabel("error norm")
-    plt.title("Error norm comparison: ETD1 vs BE")
+    plt.ylabel("Relative error norm")
+    plt.title("Relative error norm comparison: ETD1 vs BE")
     plt.yscale("log")
     plt.legend()
     plt.grid(True, which="both")
@@ -100,10 +104,10 @@ def main() -> None:
     axes[0].plot(ts, err_etd1[:, 0], "--", label="|e1| ETD1")
     axes[0].plot(ts, err_be[:, 0], ":", label="|e1| BE")
     axes[0].set_xlabel("t")
-    axes[0].set_ylabel("absolute error")
-    axes[0].set_title("Component 1 error")
+    axes[0].set_ylabel("relative error")
+    axes[0].set_title("Component 1 relative error")
     axes[0].set_yscale("log")
-    axes[0].set_ylim([10 ** (-18), 10**1])
+    axes[0].set_ylim([10 ** (-18), 10**2])
     axes[0].legend()
     axes[0].grid(True, which="both")
 
@@ -111,14 +115,14 @@ def main() -> None:
     axes[1].plot(ts, err_etd1[:, 1], "--", label="|e2| ETD1")
     axes[1].plot(ts, err_be[:, 1], ":", label="|e2| BE")
     axes[1].set_xlabel("t")
-    axes[1].set_ylabel("absolute error")
-    axes[1].set_title("Component 2 error")
+    axes[1].set_ylabel("relative error")
+    axes[1].set_title("Component 2 relative error")
     axes[1].set_yscale("log")
-    axes[1].set_ylim([10 ** (-18), 10**1])
+    axes[1].set_ylim([10 ** (-18), 10**6])
     axes[1].legend()
     axes[1].grid(True, which="both")
 
-    fig.suptitle("Componentwise error: ETD1 vs BE")
+    fig.suptitle("Componentwise relative error: ETD1 vs BE")
     fig.tight_layout()
     fig.savefig("results/compare_etd_be/error_components_compare.png", dpi=300)
     plt.close(fig)
@@ -162,8 +166,12 @@ def plot_error_scaling() -> None:
         u_etd1 = res_etd1.u
         u_be = res_be.u
 
-        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
-        errn_be = np.linalg.norm(u_be - u_ex, axis=1)
+        eps = 1e-14
+
+        # relative errors
+        u_ex_norm = np.maximum(np.linalg.norm(u_ex, axis=1), eps)
+        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1) / u_ex_norm
+        errn_be = np.linalg.norm(u_be - u_ex, axis=1) / u_ex_norm
 
         errors_etd1 = np.append(errors_etd1, np.max(errn_etd1))
         errors_be = np.append(errors_be, np.max(errn_be))
@@ -175,8 +183,8 @@ def plot_error_scaling() -> None:
     ref_oh = errors_be[0] * (hs / hs[0])
     plt.loglog(hs, ref_oh, "k-.", label=r"$O(h)$")
     plt.xlabel("h", fontsize=13)
-    plt.ylabel(r"$\max_t \|e(t)\|_2$", fontsize=13)
-    plt.title("Max error vs step size")
+    plt.ylabel(r"relative $\max_t \|e(t)\|_2 / \|u_{\text{ex}}(t)\|_2$", fontsize=13)
+    plt.title("Max relative error vs step size")
     plt.grid(True, which="both")
     plt.legend()
     plt.savefig("results/compare_etd_be/error_scaling_be.png", dpi=300)

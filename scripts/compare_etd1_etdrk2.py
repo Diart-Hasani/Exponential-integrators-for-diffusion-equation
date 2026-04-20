@@ -10,9 +10,9 @@ from src.time_diff.etdrk2 import etdrk2_solve
 
 def main() -> None:
     alpha = 1.0
-    ratio = 1.0
+    ratio = 100.0
     t0 = 0.0
-    T = 10.0
+    T = 3.0
     h = 0.1
 
     A = matrix_2x2(alpha=alpha, ratio=ratio)
@@ -44,15 +44,19 @@ def main() -> None:
     u_etd1 = res_etd1.u
     u_etdrk2 = res_etdrk2.u
 
-    err_etd1 = np.abs(u_etd1 - u_ex)
-    err_etdrk2 = np.abs(u_etdrk2 - u_ex)
+    eps = 1e-14
 
-    errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
-    errn_etdrk2 = np.linalg.norm(u_etdrk2 - u_ex, axis=1)
+    # relative errors
+    err_etd1 = np.abs(u_etd1 - u_ex) / np.maximum(np.abs(u_ex), eps)
+    err_etdrk2 = np.abs(u_etdrk2 - u_ex) / np.maximum(np.abs(u_ex), eps)
+
+    u_ex_norm = np.maximum(np.linalg.norm(u_ex, axis=1), eps)
+    errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1) / u_ex_norm
+    errn_etdrk2 = np.linalg.norm(u_etdrk2 - u_ex, axis=1) / u_ex_norm
 
     print(f"Compare ETD1 vs ETDRK2: alpha={alpha}, h={h}, steps={res_etd1.n_steps}")
-    print(f"ETD1 max abs error overall: {np.max(err_etd1)}")
-    print(f"ETDRK2   max abs error overall: {np.max(err_etdrk2)}")
+    print(f"ETD1 relative max error overall: {np.max(err_etd1)}")
+    print(f"ETDRK2 relative max error overall: {np.max(err_etdrk2)}")
 
     # u1 and u2
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
@@ -83,13 +87,13 @@ def main() -> None:
     fig.savefig("results/compare_etd1_etdrk2/u1_u2_compare.png", dpi=300)
     plt.close(fig)
 
-    # error norms
+    # relative error norms
     plt.figure()
     plt.plot(ts, errn_etd1, "--", label="||error||_2 ETD1")
     plt.plot(ts, errn_etdrk2, ":", label="||error||_2 ETDRK2")
     plt.xlabel("t")
-    plt.ylabel("error norm")
-    plt.title("Error norm comparison: ETD1 vs ETDRK2")
+    plt.ylabel("Relative error norm")
+    plt.title("Relative error norm comparison: ETD1 vs ETDRK2")
     plt.yscale("log")
     plt.legend()
     plt.grid(True, which="both")
@@ -98,34 +102,35 @@ def main() -> None:
     # componentwise errors in one figure
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    # left plot: e1
+    # left plot: relative e1
     axes[0].plot(ts, err_etd1[:, 0], "--", label="|e1| ETD1")
     axes[0].plot(ts, err_etdrk2[:, 0], ":", label="|e1| ETDRK2")
     axes[0].set_xlabel("t")
-    axes[0].set_ylabel("absolute error")
-    axes[0].set_title("Component 1 error")
+    axes[0].set_ylabel("relative error")
+    axes[0].set_title("Component 1 relative error")
     axes[0].set_yscale("log")
     axes[0].legend()
     axes[0].grid(True, which="both")
 
-    # right plot: e2
+    # right plot: relative e2
     axes[1].plot(ts, err_etd1[:, 1], "--", label="|e2| ETD1")
     axes[1].plot(ts, err_etdrk2[:, 1], ":", label="|e2| ETDRK2")
     axes[1].set_xlabel("t")
-    axes[1].set_ylabel("absolute error")
-    axes[1].set_title("Component 2 error")
+    axes[1].set_ylabel("relative error")
+    axes[1].set_title("Component 2 relative error")
     axes[1].set_yscale("log")
     axes[1].legend()
     axes[1].grid(True, which="both")
 
-    fig.suptitle("Componentwise error: ETD1 vs ETDRK2")
+    fig.suptitle("Componentwise relative error: ETD1 vs ETDRK2")
     fig.tight_layout()
     fig.savefig("results/compare_etd1_etdrk2/error_components_compare.png", dpi=300)
     plt.close(fig)
 
+
 def plot_error_scaling() -> None:
     alpha = 1.0
-    ratio = 10.0
+    ratio = 100.0
     t0 = 0.0
     T = 10.0
     hs = np.array([0.1, 0.03, 0.01, 0.003, 0.001])
@@ -134,7 +139,6 @@ def plot_error_scaling() -> None:
     # Choose nonlinearity = "sine" or "quadratic"
     # Choos kind = "oscillatory", "mixed_decay", "stiffer_exact" or "pure_trig"
     problem = make_semilinear_problem(A, beta=-1, kind="oscillatory")
-
 
     errors_etd1 = np.array([])
     errors_etdrk2 = np.array([])
@@ -164,8 +168,12 @@ def plot_error_scaling() -> None:
         u_etd1 = res_etd1.u
         u_etdrk2 = res_etdrk2.u
 
-        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1)
-        errn_etdrk2 = np.linalg.norm(u_etdrk2 - u_ex, axis=1)
+        eps = 1e-14
+
+        # relative errors
+        u_ex_norm = np.maximum(np.linalg.norm(u_ex, axis=1), eps)
+        errn_etd1 = np.linalg.norm(u_etd1 - u_ex, axis=1) / u_ex_norm
+        errn_etdrk2 = np.linalg.norm(u_etdrk2 - u_ex, axis=1) / u_ex_norm
 
         errors_etd1 = np.append(errors_etd1, np.max(errn_etd1))
         errors_etdrk2 = np.append(errors_etdrk2, np.max(errn_etdrk2))
@@ -176,10 +184,10 @@ def plot_error_scaling() -> None:
     plt.loglog(hs, errors_etdrk2, "s:", label="ETDRK2")
     ref_oh = errors_etd1[0] * (hs / hs[0])
     plt.loglog(hs, ref_oh, "k-.", label=r"$O(h)$")
-    ref_oh2 = errors_etdrk2[0] * (hs / hs[0])**2
+    ref_oh2 = errors_etdrk2[0] * (hs / hs[0]) ** 2
     plt.loglog(hs, ref_oh2, "b-.", label=r"$O(h^2)$")
     plt.xlabel("h", fontsize=13)
-    plt.ylabel(r"$\max_t \|e(t)\|_2$", fontsize=13)
+    plt.ylabel(r"relative $\max_t \|e(t)\|_2 / \|u_{\text{ex}}(t)\|_2$", fontsize=13)
     plt.title("Max error vs step size")
     plt.grid(True, which="both")
     plt.legend()
